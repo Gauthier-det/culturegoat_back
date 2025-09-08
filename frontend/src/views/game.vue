@@ -17,6 +17,7 @@ let timerInterval;
 
 let answered = false;
 
+// Empêche de revenir en arrière vers la room
 onBeforeRouteLeave((to, from, next) => {
   if (to.path.includes("/room")) {
     from(false);
@@ -27,14 +28,16 @@ onBeforeRouteLeave((to, from, next) => {
 });
 
 onMounted(() => {
+  // Joueur prêt
   socket.emit("ready", roomId);
 
+  // Réception des questions
   socket.on("newQuestion", (q) => {
     currentQuestion.value = q.question;
     options.value = q.options;
     timeLeft.value = q.time;
     answered = false;
-    startTimer();
+    // startTimer();
   });
 
   socket.on("updatePlayers", (room) => {
@@ -48,12 +51,14 @@ onMounted(() => {
   });
 });
 
+// Envoi de la réponse du joueur
 function sendAnswer(answer) {
   answered = true;
   socket.emit("answer", { roomId, answer });
 }
 
-function startTimer() {
+// Je crois que cette fonction est inutile vu que le serveur gère le timer
+/*function startTimer() {
   clearInterval(timerInterval);
   timerInterval = setInterval(() => {
     timeLeft.value--;
@@ -62,7 +67,7 @@ function startTimer() {
       clearInterval(timerInterval);
     }
   }, 1000);
-}
+}*/
 </script>
 
 <template>
@@ -77,15 +82,11 @@ function startTimer() {
           {{ opt }}
         </button>
       </div>
-
-      <h3>Scores</h3>
-      <ul>
-        <li v-for="(p, id) in players" :key="id">{{ p.name }} - {{ p.score }}</li>
-      </ul>
     </div>
 
     <div v-else>
       <h2>Fin de la partie 🎉</h2>
+      <h3>Scores finaux :</h3>
       <ul>
         <li v-for="(p, id) in players" :key="id">{{ p.name }} - {{ p.score }}</li>
       </ul>

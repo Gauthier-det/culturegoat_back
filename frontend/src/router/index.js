@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
-import Accueil from "../views/accueil.vue";
-import Room from "../views/room.vue";
-import Game from "../views/game.vue";
+import Accueil from "../views/Home.vue";
+import Room from "../views/Room.vue";
+import Game from "../views/Game.vue";
 
 const routes = [
     { path: "/", component: Accueil },

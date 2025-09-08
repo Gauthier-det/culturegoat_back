@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import socket from "@/socket"; // une seule instance partagée
+import socket from "@/socket"; 
 
 const route = useRoute();
 const router = useRouter();
@@ -19,7 +19,7 @@ socket.on("updatePlayers", (room) => {
 });
 
 function startGame() {
-  socket.emit("prepareGame", roomId); // tous les joueurs vont sur /game
+  socket.emit("prepareGame", roomId); 
 }
 
 socket.on("gameStarting", () => {
@@ -31,7 +31,7 @@ socket.on("gameStarting", () => {
   <div>
     <h1>Room {{ roomId }}</h1>
     <ul>
-      <li v-for="(p, id) in players" :key="id">{{ p.name }} - {{ p.score }}</li>
+      <li v-for="(p, id) in players" :key="id">{{ p.name }}</li>
     </ul>
 
     <button v-if="isHost" @click="startGame">Démarrer la partie</button>

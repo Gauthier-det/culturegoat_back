@@ -8,7 +8,7 @@ const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
 });
 
-// Exemple de questions
+/*-----------------------------------------------------------------------*/
 const questionsBank = [
   {
     q: "Quelle est la capitale de la France ?",
@@ -21,13 +21,13 @@ const questionsBank = [
     a: "4",
   },
 ];
+/*-----------------------------------------------------------------------*/
 
 let rooms = {};
 
 io.on("connection", (socket) => {
-  
 
-  // Création ou rejoint une room
+  //Création ou rejoindre une room
   socket.on("joinRoom", ({ roomId, playerName, isHost }) => {
     if (!rooms[roomId]) {
       console.log("Nouveau joueur :", socket.id, " dans la room :", roomId);
@@ -47,17 +47,17 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("updatePlayers", rooms[roomId]);
   });
 
+  // Mise en place de la partie
   socket.on("prepareGame", (roomId) => {
     io.to(roomId).emit("gameStarting");
   });
 
+  // Attente des joueurs prêts
   socket.on("ready", (roomId) => {
     let room = rooms[roomId];
     if (!room) return;
 
     room.readyPlayers[socket.id] = true;
-
-    // Vérifie si tous les joueurs sont prêts
     const allReady = Object.values(room.readyPlayers).every((v) => v);
     if (allReady && !room.started) {
       room.started = true;
@@ -66,7 +66,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Réponse d'un joueur
+  // Traitement des réponses
   socket.on("answer", ({ roomId, answer }) => {
     let room = rooms[roomId];
     if (!room) return;
@@ -88,6 +88,7 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Envoi des questions aux joueurs de la room
   function sendQuestion(roomId) {
     let room = rooms[roomId];
     if (!room) return;

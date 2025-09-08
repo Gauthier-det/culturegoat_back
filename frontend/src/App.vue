@@ -1,10 +1,10 @@
 <script>
-import Accueil from "./views/accueil.vue";
-import Game from "./views/game.vue";
+import Home from "./views/Home.vue";
+import Game from "./views/Game.vue";
 
 export default {
   components: {
-    Accueil,
+    Home,
     Game
   }
 };
