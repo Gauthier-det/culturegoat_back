@@ -82,8 +82,8 @@ button:disabled {
 }
 
 /* Boutons de réponses “cliqués” */
-.game-options button.clicked {
-  background: #8e6ca3;
+.clicked {
+  background: green;
 }
 
 /* Accueil : boutons espacés */

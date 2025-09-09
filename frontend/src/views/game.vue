@@ -15,7 +15,7 @@ const gameOver = ref(false);
 
 let timerInterval;
 
-let answered = false;
+let answered = ref(false);
 
 // Empêche de revenir en arrière vers la room
 onBeforeRouteLeave((to, from, next) => {
@@ -36,7 +36,7 @@ onMounted(() => {
     currentQuestion.value = q.question;
     options.value = q.options;
     timeLeft.value = q.time;
-    answered = false;
+    answered.value = false;
     // startTimer();
   });
 
@@ -53,21 +53,10 @@ onMounted(() => {
 
 // Envoi de la réponse du joueur
 function sendAnswer(answer) {
-  answered = true;
+  answered.value = true;
   socket.emit("answer", { roomId, answer });
 }
 
-// Je crois que cette fonction est inutile vu que le serveur gère le timer
-/*function startTimer() {
-  clearInterval(timerInterval);
-  timerInterval = setInterval(() => {
-    timeLeft.value--;
-    if (timeLeft.value <= 0) {
-      answered = false;
-      clearInterval(timerInterval);
-    }
-  }, 1000);
-}*/
 </script>
 
 <template>
@@ -78,7 +67,7 @@ function sendAnswer(answer) {
       <h2>{{ currentQuestion }}</h2>
       <p>Temps restant : {{ timeLeft }}s</p>
       <div class="game-options">
-        <button v-for="opt in options" :key="opt" @click="sendAnswer(opt)" :disabled="answered" :class="{ clicked: answered }">
+        <button v-for="opt in options" :key="opt" @click="sendAnswer(opt)" :disabled="answered" :class="{ clicked: answered.value }">
           {{ opt }}
         </button>
       </div>
