@@ -12,6 +12,7 @@ const options = ref([]);
 const timeLeft = ref(0);
 const players = ref({});
 const gameOver = ref(false);
+const clickedOption = ref(null);
 
 let timerInterval;
 
@@ -37,7 +38,8 @@ onMounted(() => {
     options.value = q.options;
     timeLeft.value = q.time;
     answered.value = false;
-    // startTimer();
+    clickedOption.value = null;
+    startTimer();
   });
 
   socket.on("updatePlayers", (room) => {
@@ -53,8 +55,22 @@ onMounted(() => {
 
 // Envoi de la réponse du joueur
 function sendAnswer(answer) {
+  clickedOption.value = answer;
+  console.log("Option cliquée :", clickedOption.value);
   answered.value = true;
   socket.emit("answer", { roomId, answer });
+}
+
+function startTimer(){
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    if (timeLeft.value > 0) {
+      timeLeft.value--;
+    } else {
+      clearInterval(timerInterval);
+      answered.value = true; 
+    }
+  }, 1000);
 }
 
 </script>
@@ -67,7 +83,7 @@ function sendAnswer(answer) {
       <h2>{{ currentQuestion }}</h2>
       <p>Temps restant : {{ timeLeft }}s</p>
       <div class="game-options">
-        <button v-for="opt in options" :key="opt" @click="sendAnswer(opt)" :disabled="answered" :class="{ clicked: answered.value }">
+        <button v-for="opt in options" :key="opt" @click="sendAnswer(opt)" :disabled="answered" :class="{ clicked: clickedOption == opt }">
           {{ opt }}
         </button>
       </div>
@@ -82,3 +98,11 @@ function sendAnswer(answer) {
     </div>
   </div>
 </template>
+
+<style>
+button.clicked {
+  background-color: green !important;
+  color: white !important;
+  border: 2px solid #444;
+}
+</style>
