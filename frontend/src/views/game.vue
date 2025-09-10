@@ -13,6 +13,7 @@ const timeLeft = ref(0);
 const players = ref({});
 const gameOver = ref(false);
 const clickedOption = ref(null);
+const type = ref(null);
 
 let timerInterval;
 
@@ -37,6 +38,8 @@ onMounted(() => {
     currentQuestion.value = q.question;
     options.value = q.options;
     timeLeft.value = q.time;
+    type.value = q.type;
+    console.log("type de question : " , type.value);
     answered.value = false;
     clickedOption.value = null;
     startTimer();
@@ -55,9 +58,17 @@ onMounted(() => {
 
 // Envoi de la réponse du joueur
 function sendAnswer(answer) {
-  clickedOption.value = answer;
-  console.log("Option cliquée :", clickedOption.value);
-  answered.value = true;
+  if(type.value === 'qcm'){
+    clickedOption.value = answer;
+    console.log("Option cliquée :", clickedOption.value);
+    answered.value = true;
+  }
+  else{
+    if(options.value.includes(answer)){
+      answered.value = true;
+      answer = 1;
+    }
+  }
   socket.emit("answer", { roomId, answer });
 }
 
@@ -82,10 +93,18 @@ function startTimer(){
     <div v-if="!gameOver">
       <h2>{{ currentQuestion }}</h2>
       <p>Temps restant : {{ timeLeft }}s</p>
-      <div class="game-options">
-        <button v-for="opt in options" :key="opt" @click="sendAnswer(opt)" :disabled="answered" :class="{ clicked: clickedOption == opt }">
-          {{ opt }}
-        </button>
+      <div class="qcmQuest" v-if="type === 'qcm'">
+        <div class="game-options">
+          <button v-for="opt in options" :key="opt" @click="sendAnswer(opt)" :disabled="answered" :class="{ clicked: clickedOption == opt }">
+            {{ opt }}
+          </button>
+        </div>
+      </div>
+      <div class="openQuest" v-else-if="type === 'open'">
+        <div class="game-options">
+          <input type="text" v-model="clickedOption" :disabled="answered" placeholder="Votre réponse" />
+          <button @click="sendAnswer(clickedOption)" :disabled="answered || !clickedOption">Valider</button>
+        </div>
       </div>
     </div>
 

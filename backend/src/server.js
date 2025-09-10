@@ -1,5 +1,6 @@
 const express = require("express");
 const http = require("http");
+const { type } = require("os");
 const { Server } = require("socket.io");
 
 const app = express();
@@ -14,11 +15,13 @@ const questionsBank = [
     q: "Quelle est la capitale de la France ?",
     options: ["Paris", "Berlin", "Madrid", "Rome"],
     a: "Paris",
+    type: "qcm"
   },
   {
-    q: "2+2 = ?",
-    options: ["3", "4", "5", "6"],
-    a: "4",
+    q: "Dans quel films trouve t-on le personnage de Jack Sparrow ?",
+    options: ["pirates des caraibes", "piratesdescaraibes", "piratesdescaraïbes", "pirates des caraïbes"],
+    a: "1",
+    type: "open"
   },
 ];
 /*-----------------------------------------------------------------------*/
@@ -102,6 +105,7 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("newQuestion", {
       question: q.q,
       options: q.options,
+      type: q.type,
       time: 12 
     });
 
