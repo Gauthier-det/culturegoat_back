@@ -66,7 +66,7 @@ function sendAnswer(answer) {
   else{
     if(options.value.includes(answer)){
       answered.value = true;
-      answer = 1;
+      answer = "1";
     }
   }
   socket.emit("answer", { roomId, answer });

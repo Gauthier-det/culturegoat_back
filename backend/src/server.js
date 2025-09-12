@@ -2,6 +2,15 @@ const express = require("express");
 const http = require("http");
 const { type } = require("os");
 const { Server } = require("socket.io");
+const { default: Question } = require("./Question");
+const mysql = require("mysql2/promise");
+
+const pool = mysql.createPool({
+  host: "localhost",
+  user: "culturegoat",       
+  password: "GaLuBaRaGOAT", 
+  database: "culturegoat",  
+});
 
 const app = express();
 const server = http.createServer(app);
@@ -10,20 +19,24 @@ const io = new Server(server, {
 });
 
 /*-----------------------------------------------------------------------*/
-const questionsBank = [
-  {
-    q: "Quelle est la capitale de la France ?",
-    options: ["Paris", "Berlin", "Madrid", "Rome"],
-    a: "Paris",
-    type: "qcm"
-  },
-  {
-    q: "Dans quel films trouve t-on le personnage de Jack Sparrow ?",
-    options: ["pirates des caraibes", "piratesdescaraibes", "piratesdescaraïbes", "pirates des caraïbes"],
-    a: "1",
-    type: "open"
-  },
-];
+async function getRandomQuestion() {
+  const [rows] = await pool.query("SELECT * FROM question ORDER BY RAND() LIMIT 1");
+  if (rows.length === 0) return null;
+  console.log("Row from DB:", rows[0]);
+  const q = rows[0];
+  return new Question(
+    q.que_id,
+    q.que_question,
+    [q.que_option1, q.que_option2, q.que_option3, q.que_option4],
+    q.que_response,
+    q.que_desc,
+    q.que_topic,
+    q.que_type,
+    q.que_image
+  );
+}
+
+
 /*-----------------------------------------------------------------------*/
 
 let rooms = {};
@@ -40,6 +53,8 @@ io.on("connection", (socket) => {
         started: false,
         currentQuestionIndex: 0,
         readyPlayers: {},
+        question_now: null,
+        nbQuestionsAsked: 0
       };
     }
 
@@ -74,8 +89,8 @@ io.on("connection", (socket) => {
     let room = rooms[roomId];
     if (!room) return;
 
-    let q = questionsBank[room.currentQuestionIndex];
-    if (answer === q.a) {
+    let q = rooms[roomId].question_now;
+    if (answer === q.response) {
       room.players[socket.id].score += 1;
     }
   });
@@ -92,25 +107,31 @@ io.on("connection", (socket) => {
   });
 
   // Envoi des questions aux joueurs de la room
-  function sendQuestion(roomId) {
+  async function sendQuestion(roomId) {
     let room = rooms[roomId];
     if (!room) return;
 
-    let q = questionsBank[room.currentQuestionIndex];
-    if (!q) {
+    room.question_now = await getRandomQuestion();
+    let q = room.question_now;
+    console.log(q.question);
+    if (room.nbQuestionsAsked >= 2) {
       io.to(roomId).emit("gameOver", room.players);
+      room.nbQuestionsAsked = 0;
       return;
     }
     
     io.to(roomId).emit("newQuestion", {
-      question: q.q,
+      question: q.question,
       options: q.options,
       type: q.type,
       time: 12 
+      
     });
 
+    room.nbQuestionsAsked++;
+
     setTimeout(() => {
-      room.currentQuestionIndex++;
+      rooms[roomId].currentQuestionIndex++;
       sendQuestion(roomId);
     }, 12000); 
   }
