@@ -20,19 +20,36 @@ const io = new Server(server, {
 
 /*-----------------------------------------------------------------------*/
 async function getRandomQuestion() {
-  const [rows] = await pool.query("SELECT * FROM question ORDER BY RAND() LIMIT 1");
+
+
+
+  const [rows] = await pool.query(
+    "SELECT * FROM question que join question_option opt using (que_id) join (select que_id as random_id from question que2 order by rand() limit 1) as rand on que.que_id = random_id"
+  );
+
   if (rows.length === 0) return null;
   console.log("Row from DB:", rows[0]);
   const q = rows[0];
+  var options = [];
+
+  console.log(rows);
+
+  var options = rows.map(row => row.opt_label);
+
+  if (q.que_type === 'qcm' && options.length < 4 || options.length > 4) {
+    console.error("Erreur : Nombre d'options incorrect pour une question QCM.");
+    return null;
+  }
+    
   return new Question(
-    q.que_id,
-    q.que_question,
-    [q.que_option1, q.que_option2, q.que_option3, q.que_option4],
-    q.que_response,
-    q.que_desc,
-    q.que_topic,
-    q.que_type,
-    q.que_image
+      q.que_id,
+      q.que_question,
+      options,
+      q.que_response,
+      q.que_desc,
+      q.que_topic,
+      q.que_type,
+      q.que_image
   );
 }
 
