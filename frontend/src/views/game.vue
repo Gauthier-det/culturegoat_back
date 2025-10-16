@@ -5,7 +5,7 @@ import socket from "@/socket";
 
 const route = useRoute();
 const roomId = route.params.roomId;
-const pseudo = route.query.pseudo;
+const pseudo = sessionStorage.getItem("pseudo");
 
 const currentQuestion = ref(null);
 const options = ref([]);

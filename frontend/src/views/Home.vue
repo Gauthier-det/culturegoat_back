@@ -8,11 +8,13 @@ const router = useRouter();
 
 function createRoom() {
   let id = Math.random().toString(36).substr(2, 4);
-  router.push(`/room/${id}?pseudo=${pseudo.value}&host=true`);
+  sessionStorage.setItem("pseudo", pseudo);
+  router.push(`/room/${id}?host=true`);
 }
 
 function joinRoom() {
-  router.push(`/room/${roomId.value}?pseudo=${pseudo.value}`);
+  sessionStorage.setItem("pseudo", pseudo);
+  router.push(`/room/${roomId.value}`);
 }
 </script>
 

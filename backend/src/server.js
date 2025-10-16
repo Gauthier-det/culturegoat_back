@@ -21,8 +21,6 @@ const io = new Server(server, {
 /*-----------------------------------------------------------------------*/
 async function getRandomQuestion() {
 
-
-
   const [rows] = await pool.query(
     "SELECT * FROM question que join question_option opt using (que_id) join (select que_id as random_id from question que2 order by rand() limit 1) as rand on que.que_id = random_id"
   );

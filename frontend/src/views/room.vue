@@ -7,7 +7,7 @@ const route = useRoute();
 const router = useRouter();
 
 const roomId = route.params.roomId;
-const pseudo = route.query.pseudo;
+const pseudo = sessionStorage.getItem("pseudo");
 const isHost = route.query.host === "true";
 
 const players = ref({});
@@ -23,7 +23,7 @@ function startGame() {
 }
 
 socket.on("gameStarting", () => {
-  router.push(`/game/${roomId}?pseudo=${pseudo}`);
+  router.push(`/game/${roomId}`);
 });
 </script>
 
