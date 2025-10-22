@@ -19,7 +19,7 @@ function createRoom() {
 }
 
 function joinRoom() {
-  sessionStorage.setItem("pseudo", pseudo);
+  sessionStorage.setItem("pseudo", pseudo.value);
   sessionStorage.setItem("isHost", false);
   router.push(`/room/${roomId.value}`);
 }

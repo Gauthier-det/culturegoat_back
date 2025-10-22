@@ -26,7 +26,7 @@ async function getRandomQuestion() {
   );
 
   if (rows.length === 0) return null;
-  console.log("Row from DB:", rows[0]);
+  //console.log("Row from DB:", rows[0]);
   const q = rows[0];
   var options = [];
 

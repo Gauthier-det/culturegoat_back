@@ -12,7 +12,7 @@ const currentQuestion = ref(null);
 const options = ref([]);
 const timeLeft = ref(0);
 const players = ref({});
-const gameOver = ref(true);
+const gameOver = ref(false);
 const clickedOption = ref(null);
 const type = ref(null);
 
