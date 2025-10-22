@@ -11,4 +11,4 @@ class Question {
     }
 }
 
-export default Question;
+module.exports = Question;

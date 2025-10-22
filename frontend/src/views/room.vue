@@ -8,11 +8,11 @@ const router = useRouter();
 
 const roomId = route.params.roomId;
 const pseudo = sessionStorage.getItem("pseudo");
-const isHost = route.query.host === "true";
+const isHost = sessionStorage.getItem("isHost");
 
 const players = ref({});
 
-socket.emit("joinRoom", { roomId, playerName: pseudo, isHost });
+socket.emit("joinRoom", { roomId, playerName: pseudo });
 
 socket.on("updatePlayers", (room) => {
   players.value = room.players;

@@ -2,7 +2,7 @@ const express = require("express");
 const http = require("http");
 const { type } = require("os");
 const { Server } = require("socket.io");
-const { default: Question } = require("./Question");
+const Question = require("./Question");
 const mysql = require("mysql2/promise");
 
 const pool = mysql.createPool({
@@ -59,7 +59,7 @@ let rooms = {};
 io.on("connection", (socket) => {
 
   //Création ou rejoindre une room
-  socket.on("joinRoom", ({ roomId, playerName, isHost }) => {
+  socket.on("joinRoom", ({ roomId, playerName }) => {
     if (!rooms[roomId]) {
       console.log("Nouveau joueur :", socket.id, " dans la room :", roomId);
       rooms[roomId] = {

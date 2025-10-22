@@ -1,9 +1,10 @@
 <script setup>
 import { ref, onMounted } from "vue";
-import { useRoute, onBeforeRouteLeave } from "vue-router";
+import { useRoute, onBeforeRouteLeave, useRouter } from "vue-router";
 import socket from "@/socket";
 
 const route = useRoute();
+const router = useRouter();
 const roomId = route.params.roomId;
 const pseudo = sessionStorage.getItem("pseudo");
 
@@ -11,7 +12,7 @@ const currentQuestion = ref(null);
 const options = ref([]);
 const timeLeft = ref(0);
 const players = ref({});
-const gameOver = ref(false);
+const gameOver = ref(true);
 const clickedOption = ref(null);
 const type = ref(null);
 
@@ -52,6 +53,7 @@ onMounted(() => {
   socket.on("gameOver", (finalPlayers) => {
     gameOver.value = true;
     players.value = finalPlayers;
+    sessionStorage.setItem("isHost", false);
     clearInterval(timerInterval);
   });
 });
@@ -84,6 +86,10 @@ function startTimer(){
   }, 1000);
 }
 
+function backToMenu(){
+  router.push(`/`);
+}
+
 </script>
 
 <template>
@@ -114,6 +120,7 @@ function startTimer(){
       <ul>
         <li v-for="(p, id) in players" :key="id">{{ p.name }} - {{ p.score }}</li>
       </ul>
+      <button @click=backToMenu()> Menu </button> 
     </div>
   </div>
 </template>
