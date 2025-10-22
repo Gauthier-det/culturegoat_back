@@ -40,6 +40,9 @@ onMounted(() => {
     options.value = q.options;
     timeLeft.value = q.time;
     type.value = q.type;
+    console.log("question reçue : " , currentQuestion.value);
+    console.log("options reçues : " , options.value);
+    console.log("Réponse reçue : " , q.response);
     console.log("type de question : " , type.value);
     answered.value = false;
     clickedOption.value = null;
@@ -69,6 +72,10 @@ function sendAnswer(answer) {
     if(options.value.includes(answer)){
       answered.value = true;
       answer = "1";
+    }
+    else{
+      answer = "0";
+      return
     }
   }
   socket.emit("answer", { roomId, answer });

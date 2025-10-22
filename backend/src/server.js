@@ -3,53 +3,12 @@ const http = require("http");
 const { type } = require("os");
 const { Server } = require("socket.io");
 const Question = require("./Question");
-const mysql = require("mysql2/promise");
-
-const pool = mysql.createPool({
-  host: "localhost",
-  user: "culturegoat",       
-  password: "GaLuBaRaGOAT", 
-  database: "culturegoat",  
-});
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
 });
-
-/*-----------------------------------------------------------------------*/
-async function getRandomQuestion() {
-
-  const [rows] = await pool.query(
-    "SELECT * FROM question que join question_option opt using (que_id) join (select que_id as random_id from question que2 order by rand() limit 1) as rand on que.que_id = random_id"
-  );
-
-  if (rows.length === 0) return null;
-  //console.log("Row from DB:", rows[0]);
-  const q = rows[0];
-  var options = [];
-
-  console.log(rows);
-
-  var options = rows.map(row => row.opt_label);
-
-  if (q.que_type === 'qcm' && options.length < 4 || options.length > 4) {
-    console.error("Erreur : Nombre d'options incorrect pour une question QCM.");
-    return null;
-  }
-    
-  return new Question(
-      q.que_id,
-      q.que_question,
-      options,
-      q.que_response,
-      q.que_desc,
-      q.que_topic,
-      q.que_type,
-      q.que_image
-  );
-}
 
 
 /*-----------------------------------------------------------------------*/
@@ -126,9 +85,9 @@ io.on("connection", (socket) => {
     let room = rooms[roomId];
     if (!room) return;
 
-    room.question_now = await getRandomQuestion();
+    room.question_now = await Question.getRandomQuestion();
     let q = room.question_now;
-    console.log(q.question);
+    //console.log(q.question);
     if (room.nbQuestionsAsked >= 2) {
       io.to(roomId).emit("gameOver", room.players);
       room.nbQuestionsAsked = 0;
@@ -140,7 +99,6 @@ io.on("connection", (socket) => {
       options: q.options,
       type: q.type,
       time: 12 
-      
     });
 
     room.nbQuestionsAsked++;
