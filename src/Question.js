@@ -1,77 +1,72 @@
-const mysql = require("mysql2/promise");
-require("dotenv").config();
+import { Client } from "pg";
+import dotenv from "dotenv";
+dotenv.config();
 
-const DB_HOST = process.env.DB_HOST;
-const DB_USER = process.env.DB_USER;
-const DB_PASS = process.env.DB_PASS;
-const DB_NAME = process.env.DB_NAME;
+const DB_HOST = process.env.DB_HOST_PG;
 
-console.log("DB_HOST:", DB_HOST);
-console.log("DB_USER:", DB_USER);
-console.log("DB_PASS:", DB_PASS);
-console.log("DB_NAME:", DB_NAME);
-
-const pool = mysql.createPool({
-    host: DB_HOST,
-    user: DB_USER,
-    password: DB_PASS,
-    database: DB_NAME,
+const client = new Client({
+  connectionString: DB_HOST,
+  ssl: { rejectUnauthorized: false },
 });
 
+await client.connect();
+
 class Question {
-    constructor(id, question, options, response, desc, topic, type, image_link) {
-        this.id = id;
-        this.question = question;
-        this.options = options;
-        this.response = response;
-        this.desc = desc;
-        this.image_link = image_link;
-        this.topic = topic;
-        this.type = type;
+  constructor(id, question, options, response, desc, topic, type, image_link) {
+    this.id = id;
+    this.question = question;
+    this.options = options;
+    this.response = response;
+    this.desc = desc;
+    this.image_link = image_link;
+    this.topic = topic;
+    this.type = type;
+  }
+
+  static async getRandomQuestion() {
+    const query = `
+      SELECT * 
+      FROM question que
+      JOIN question_option opt ON que.que_id = opt.que_id
+      JOIN question_type typ ON typ.typ_id = que.typ_id
+      JOIN question_topic top ON top.top_id = que.top_id
+      JOIN (
+        SELECT que_id AS random_id FROM question ORDER BY random() LIMIT 1
+      ) AS rand ON que.que_id = rand.random_id;
+    `;
+
+    const res = await client.query(query);
+    const rows = res.rows;
+
+    if (rows.length === 0) return null;
+
+    const q = rows[0];
+    let options = rows.map((row) => row.opt_label);
+    let response = "";
+
+    if (q.typ_label === "open") {
+      response = "1";
+    } else if (q.typ_label === "qcm") {
+      const correctOption = rows.find((r) => r.opt_iscorrect === 1);
+      if (correctOption) response = correctOption.opt_label;
     }
 
-    static async getRandomQuestion() {
-        const [rows] = await pool.query(
-            "SELECT * FROM question que join question_option opt on que.que_id = opt.que_id join question_type typ on typ.typ_id = que.typ_id join question_topic top on top.top_id = que.top_id join ( select que_id as random_id from question que2 order by rand() limit 1 ) as rand on que.que_id = random_id;"
-        );
-
-        if (rows.length === 0) return null;
-        //console.log("Row from DB:", rows[0]);
-        const q = rows[0];
-        var options = [];
-        var response = "";
-
-        if (q.typ_label === "open") {
-            response = "1";
-        } else if (q.typ_label === "qcm") {
-            for (let i = 0; i < rows.length; i++) {
-                console.log("opt_iscorrect : ", rows[i].opt_iscorrect);
-                if (rows[i].opt_iscorrect == 1) {
-                    response = rows[i].opt_label;
-                    break;
-                }
-            }
-        }
-        console.log("response : ",response);
-        var options = rows.map(row => row.opt_label);
-
-        if (q.que_type === 'qcm' && options.length < 4 || options.length > 4) {
-            console.error("Erreur : Nombre d'options incorrect pour une question QCM.");
-            return null;
-        }
-            
-        return new Question(
-            q.que_id,
-            q.que_question,
-            options,
-            response,
-            q.que_desc,
-            q.top_label,
-            q.typ_label,
-            q.que_image
-        );
+    if (q.typ_label === "qcm" && (options.length < 4 || options.length > 4)) {
+      console.error("Erreur : Nombre d'options incorrect pour une question QCM.");
+      return null;
     }
+
+    return new Question(
+      q.que_id,
+      q.que_question,
+      options,
+      response,
+      q.que_desc,
+      q.top_label,
+      q.typ_label,
+      q.que_image
+    );
+  }
 }
 
-
-module.exports = Question;
+export default Question;
