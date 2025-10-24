@@ -1,7 +1,7 @@
 Utilisation :
 
 - Lancer le server avec node (>node server.js)
-- Lancer le client avec vue (>npm run dev) sur le répertoire frontend
+- Lancer le client avec vue (>npm run dev) sur le répertoire frontend (https://github.com/Gauthier_det/culturegoat_front)
 
 Git :
 
