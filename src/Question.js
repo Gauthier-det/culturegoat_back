@@ -1,4 +1,4 @@
-import { Client } from "pg";
+const { Client } = require("pg");
 import dotenv from "dotenv";
 dotenv.config();
 
