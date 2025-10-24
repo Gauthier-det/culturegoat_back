@@ -3,6 +3,7 @@ const http = require("http");
 const { type } = require("os");
 const { Server } = require("socket.io");
 const Question = require("./Question");
+const GameRules = require("./GameRules");
 
 const app = express();
 const server = http.createServer(app);
@@ -10,10 +11,61 @@ const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
 });
 
+let rooms = {};
 
 /*-----------------------------------------------------------------------*/
 
-let rooms = {};
+// Envoi des questions aux joueurs de la room
+async function sendQuestion(roomId) {
+  let room = rooms[roomId];
+  if (!room) return;
+
+  room.question_now = await Question.getRandomQuestion();
+  let q = room.question_now;
+  //console.log(q.question);
+  console.log(room.gameRules.rules);
+  if (room.gameRules.rules == "ScoreMax") {
+    for (let playerId in room.players) {
+      console.log(room.players[playerId].score);
+      if (room.players[playerId].score >= room.gameRules.scoreMax) {
+        io.to(roomId).emit("gameOver", room.players);
+        room.nbQuestionsAsked = 0;
+        return;
+      }
+    }
+  }
+  else if (room.gameRules.rules == "FixedQuestions") {
+    //console.log(room.nbQuestionsAsked, room.gameRules.questionMax);
+    if (room.nbQuestionsAsked >= room.gameRules.questionMax) {
+      io.to(roomId).emit("gameOver", room.players);
+      room.nbQuestionsAsked = 0;
+      return;
+    }
+  }
+
+  let timeLimit = 5;
+  if (q.type === "qcm") {
+    timeLimit = room.gameRules.qcmTimeLimit || 8;
+  } else if (q.type === "open") {
+    timeLimit = room.gameRules.openTimeLimit || 12;
+  }
+  
+  io.to(roomId).emit("newQuestion", {
+    question: q.question,
+    options: q.options,
+    type: q.type,
+    time: timeLimit
+  });
+
+  room.nbQuestionsAsked++;
+
+  setTimeout(() => {
+    rooms[roomId].currentQuestionIndex++;
+    sendQuestion(roomId);
+  }, timeLimit * 1000);
+}
+
+/*-----------------------------------------------------------------------*/
 
 io.on("connection", (socket) => {
 
@@ -41,6 +93,7 @@ io.on("connection", (socket) => {
 
   // Mise en place de la partie
   socket.on("prepareGame", (roomId) => {
+    rooms[roomId].gameRules = new GameRules("ScoreMax", 2, 8, 13, null);
     io.to(roomId).emit("gameStarting");
   });
 
@@ -80,34 +133,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Envoi des questions aux joueurs de la room
-  async function sendQuestion(roomId) {
-    let room = rooms[roomId];
-    if (!room) return;
-
-    room.question_now = await Question.getRandomQuestion();
-    let q = room.question_now;
-    //console.log(q.question);
-    if (room.nbQuestionsAsked >= 2) {
-      io.to(roomId).emit("gameOver", room.players);
-      room.nbQuestionsAsked = 0;
-      return;
-    }
-    
-    io.to(roomId).emit("newQuestion", {
-      question: q.question,
-      options: q.options,
-      type: q.type,
-      time: 12 
-    });
-
-    room.nbQuestionsAsked++;
-
-    setTimeout(() => {
-      rooms[roomId].currentQuestionIndex++;
-      sendQuestion(roomId);
-    }, 12000); 
-  }
+  
 });
 
 server.listen(3000, () => {
