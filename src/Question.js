@@ -6,6 +6,11 @@ const DB_USER = process.env.DB_USER;
 const DB_PASS = process.env.DB_PASS;
 const DB_NAME = process.env.DB_NAME;
 
+console.log("DB_HOST:", DB_HOST);
+console.log("DB_USER:", DB_USER);
+console.log("DB_PASS:", DB_PASS);
+console.log("DB_NAME:", DB_NAME);
+
 const pool = mysql.createPool({
     host: DB_HOST,
     user: DB_USER,
