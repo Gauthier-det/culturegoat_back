@@ -1,6 +1,5 @@
-const { Client } = require("pg");
-import dotenv from "dotenv";
-dotenv.config();
+require("dotenv").config();
+const { Client } = require('pg');
 
 const DB_HOST = process.env.DB_HOST_PG;
 
