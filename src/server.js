@@ -4,6 +4,7 @@ const { type } = require("os");
 const { Server } = require("socket.io");
 const Question = require("./Question");
 const GameRules = require("./GameRules");
+const { normalizeWord } = require("./tools");
 
 const app = express();
 const server = http.createServer(app);
@@ -11,7 +12,6 @@ const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
 });
 
-let rooms = {};
 
 /*-----------------------------------------------------------------------*/
 
@@ -23,10 +23,10 @@ async function sendQuestion(roomId) {
   room.question_now = await Question.getRandomQuestion();
   let q = room.question_now;
   //console.log(q.question);
-  console.log(room.gameRules.rules);
+  //console.log(room.gameRules.rules);
   if (room.gameRules.rules == "ScoreMax") {
     for (let playerId in room.players) {
-      console.log(room.players[playerId].score);
+      //console.log(room.players[playerId].score);
       if (room.players[playerId].score >= room.gameRules.scoreMax) {
         io.to(roomId).emit("gameOver", room.players);
         room.nbQuestionsAsked = 0;
@@ -65,6 +65,8 @@ async function sendQuestion(roomId) {
   }, timeLimit * 1000);
 }
 
+let rooms = {};
+
 /*-----------------------------------------------------------------------*/
 
 io.on("connection", (socket) => {
@@ -80,20 +82,25 @@ io.on("connection", (socket) => {
         currentQuestionIndex: 0,
         readyPlayers: {},
         question_now: null,
-        nbQuestionsAsked: 0
+        nbQuestionsAsked: 0,
+        gameRules: null
       };
     }
 
     rooms[roomId].players[socket.id] = { name: playerName, score: 0 };
     rooms[roomId].readyPlayers[socket.id] = false;
+    //console.log(rooms);
     socket.join(roomId);
 
     io.to(roomId).emit("updatePlayers", rooms[roomId]);
   });
 
   // Mise en place de la partie
-  socket.on("prepareGame", (roomId) => {
-    rooms[roomId].gameRules = new GameRules("ScoreMax", 2, 8, 13, null);
+  socket.on("prepareGame", (data) => {
+    const roomId = data.roomId;
+    const rules = data.rules;
+    let gameRules = new GameRules(rules.rulesOption, rules.scoreMax, rules.qcmTimeLimit, rules.openTimeLimit, rules.questionMax);
+    rooms[roomId].gameRules = gameRules;
     io.to(roomId).emit("gameStarting");
   });
 
@@ -117,7 +124,7 @@ io.on("connection", (socket) => {
     if (!room) return;
 
     let q = rooms[roomId].question_now;
-    if (answer === q.response) {
+    if (answer === normalizeWord(q.response)) {
       room.players[socket.id].score += 1;
     }
   });
@@ -127,8 +134,13 @@ io.on("connection", (socket) => {
     for (let roomId in rooms) {
       let room = rooms[roomId];
       if (room.players[socket.id]) {
+        let newHostId = null;
         delete room.players[socket.id];
-        io.to(roomId).emit("updatePlayers", room);
+        if (socket.id === room.host) {
+          newHostId = Object.keys(room.players)[0];
+          room.host = newHostId;
+        }
+        io.to(roomId).emit("updatePlayers", room, newHostId);
       }
     }
   });
@@ -139,3 +151,5 @@ io.on("connection", (socket) => {
 server.listen(3000, () => {
   console.log("Serveur lancé sur http://localhost:3000");
 });
+
+/*-----------------------------------------------------------------------*/
