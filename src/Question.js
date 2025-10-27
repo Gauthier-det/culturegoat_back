@@ -1,5 +1,4 @@
 require("dotenv").config();
-<<<<<<< HEAD
 const { Client } = require("pg");
 
 const DB_HOST = process.env.DB_HOST_PG;
