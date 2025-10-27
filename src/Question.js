@@ -9,11 +9,15 @@ async function initClient() {
   if (!client) {
     client = new Client({
       connectionString: DB_HOST,
+      ssl: {
+        rejectUnauthorized: false
+      }
     });
     await client.connect();
   }
   return client;
 }
+
 
 class Question {
   constructor(id, question, options, response, desc, topic, type, image_link) {

@@ -100,8 +100,6 @@ io.on("connection", (socket) => {
   socket.on("prepareGame", (data) => {
     const roomId = data.roomId;
     const rules = data.rules;
-    console.log("Préparation de la partie dans la room :", roomId, " avec les règles :", rules);
-    console.log(rooms[roomId]);
     let gameRules = new GameRules(rules.rulesOption, rules.scoreMax, rules.qcmTimeLimit, rules.openTimeLimit, rules.questionMax);
     rooms[roomId].gameRules = gameRules;
     io.to(roomId).emit("gameStarting");
