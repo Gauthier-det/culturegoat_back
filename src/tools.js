@@ -8,7 +8,7 @@ function normalizeWord(str) {
     .map(word => (word.length > 2 && word.endsWith('s') ? word.slice(0, -1) : word))
     .join('');
 
-  return str;
+  return str; // Retourne la chaîne normalisée
 }
 
 function levenshtein(a, b) {
@@ -29,15 +29,19 @@ function levenshtein(a, b) {
       );
     }
   }
-  return matrix[a.length][b.length];
+  return matrix[a.length][b.length]; // Distance de Levenshtein entre a et b
 }
 
 function isCloseMatch(answer, validAnswers) {
   const normalizedAnswer = normalizeWord(answer);
+
   return validAnswers.some(opt => {
     const normalizedOpt = normalizeWord(opt);
     const distance = levenshtein(normalizedAnswer, normalizedOpt);
-    return distance <= 1; 
+    if (normalizedAnswer.length > 6) {
+      return distance <= 1;
+    }
+    return distance === 0;
   });
 }
 
