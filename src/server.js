@@ -145,7 +145,65 @@ io.on("connection", (socket) => {
     }
   });
 
-  
+  socket.on("addQuestion", async (questionData) => {
+    try {
+      const question = new Question(
+        null, 
+        questionData.question,
+        questionData.options,
+        questionData.response,
+        questionData.desc,
+        questionData.topic.label, 
+        questionData.type.label, 
+        questionData.image_link
+      );
+      console.log("Nouvelle question créée :", question);
+      
+      await question.save(questionData.topic.id, questionData.type.id);
+      io.emit("questionAdded", question);
+    } catch (error) {
+      console.error("Erreur lors de l'ajout de la question :", error);
+    }
+  });
+
+  socket.on("getTopicsAndTypes", async () => {
+    try {
+      const topics = await Question.getAllTopics();
+      const types = await Question.getAllTypes();
+      socket.emit("topicsAndTypes", { topics, types });
+    } catch (error) {
+      console.error("Erreur lors de la récupération des sujets et types :", error);
+    }
+  });
+
+  socket.on("deleteQuestion", async (questionId) => {
+    try {
+      const question = new Question();
+      question.id = questionId;
+      await question.delete();
+      io.emit("questionDeleted", questionId);
+    } catch (error) {
+      console.error("Erreur lors de la suppression de la question :", error);
+    }
+  });
+
+  socket.on("validateQuestion", async (questionId) => {
+    try {
+      const question = new Question();
+      question.id = questionId;
+      await question.validate();
+      io.emit("questionValidated", questionId);
+    } catch (error) {
+      console.error("Erreur lors de la validation de la question :", error);
+    }
+  });
+
+  socket.on("getTempQuestions", async () => {
+    const questions = await Question.getAllTempQuestions();
+    //console.log("Questions temporaires récupérées :", questions);
+    socket.emit("tempQuestions", questions);
+  });
+
 });
 
 server.listen(3000, () => {
