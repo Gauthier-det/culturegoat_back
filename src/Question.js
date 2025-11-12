@@ -128,7 +128,7 @@ class Question {
       q.que_question,
       options,
       response,
-      q.que_desc,
+      q.que_desc_response,
       q.top_label,
       q.typ_label,
       q.que_image

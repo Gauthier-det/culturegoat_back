@@ -55,7 +55,10 @@ async function sendQuestion(roomId) {
     question: q.question,
     options: q.options,
     type: q.type,
-    time: timeLimit
+    time: timeLimit + 4,
+    response: q.response,
+    desc: q.desc,
+    image_link: q.image_link
   });
 
   room.nbQuestionsAsked++;
@@ -63,7 +66,7 @@ async function sendQuestion(roomId) {
   setTimeout(() => {
     rooms[roomId].currentQuestionIndex++;
     sendQuestion(roomId);
-  }, timeLimit * 1000);
+  }, timeLimit * 1000 + 4000);
 }
 
 let rooms = {};
