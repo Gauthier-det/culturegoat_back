@@ -5,6 +5,7 @@ const { Server } = require("socket.io");
 const Question = require("./Question");
 const GameRules = require("./GameRules");
 const { normalizeWord } = require("./tools");
+const { washBDD, DB_MODE, initClient } = require("./dbConnection");
 
 const app = express();
 const server = http.createServer(app);
@@ -145,7 +146,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("addQuestion", async (questionData) => {
+  socket.on("addQuestion", async (questionData, callback) => {
     try {
       const question = new Question(
         null, 
@@ -157,10 +158,10 @@ io.on("connection", (socket) => {
         questionData.type.label, 
         questionData.image_link
       );
-      console.log("Nouvelle question créée :", question);
-      
+      //console.log("Nouvelle question créée :", question);
       await question.save(questionData.topic.id, questionData.type.id);
       io.emit("questionAdded", question);
+      callback({ success: true });
     } catch (error) {
       console.error("Erreur lors de l'ajout de la question :", error);
     }
@@ -181,6 +182,7 @@ io.on("connection", (socket) => {
       const question = new Question();
       question.id = questionId;
       await question.delete();
+      await washBDD();
       io.emit("questionDeleted", questionId);
     } catch (error) {
       console.error("Erreur lors de la suppression de la question :", error);
@@ -192,6 +194,7 @@ io.on("connection", (socket) => {
       const question = new Question();
       question.id = questionId;
       await question.validate();
+      await washBDD();
       io.emit("questionValidated", questionId);
     } catch (error) {
       console.error("Erreur lors de la validation de la question :", error);
@@ -200,7 +203,6 @@ io.on("connection", (socket) => {
 
   socket.on("getTempQuestions", async () => {
     const questions = await Question.getAllTempQuestions();
-    //console.log("Questions temporaires récupérées :", questions);
     socket.emit("tempQuestions", questions);
   });
 
