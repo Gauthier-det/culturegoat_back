@@ -30,7 +30,7 @@ async function initClient() {
       user: DB_USER,
       password: DB_PASSWORD,
       database: DB_NAME,
-      ssl: { rejectUnauthorized: false },
+      ssl: false,
     });
     console.log("✅ MySQL connected");
   } else {
@@ -40,4 +40,21 @@ async function initClient() {
   return client;
 }
 
-module.exports = { initClient, DB_MODE };
+async function washBDD() {
+  const db = await initClient();
+  let query;
+  if (DB_MODE.toUpperCase() === "POSTGRES") {
+    query = `DELETE FROM question_option where opt_label = ''; `;
+    await db.query(query);
+    query = `DELETE FROM question where que_question = ''; `;
+    await db.query(query);
+  }
+  else if (DB_MODE.toUpperCase() === "MYSQL") {
+    query = `DELETE FROM question_option where opt_label = '';`;
+    await db.query(query);
+    query = `DELETE FROM question where que_question = '';`;
+    await db.query(query);
+  }
+}
+
+module.exports = { initClient, DB_MODE, washBDD };

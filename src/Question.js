@@ -28,16 +28,16 @@ class Question {
 
     if (DB_MODE.toUpperCase() === "POSTGRES") { 
       query = `
-        INSERT INTO temp_question (xue_question, xue_desc_response, xop_id, xyp_id, xue_image)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO question (que_question, que_desc_response, top_id, typ_id, que_image, que_status)
+        VALUES ($1, $2, $3, $4, $5, 'ENC')
       `;
       values.unshift(this.id);
       res = await db.query(query, values);
-      this.id = res.rows[0].xue_id;
+      this.id = res.rows[0].que_id;
     } else if (DB_MODE.toUpperCase() === "MYSQL") {
       query = `
-        INSERT INTO temp_question (xue_question, xue_desc_response, xop_id, xyp_id, xue_image)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO question (que_question, que_desc_response, top_id, typ_id, que_image, que_status)
+        VALUES (?, ?, ?, ?, ?, 'ENC')
       `;
       res = await db.query(query, values);
       this.id = res[0].insertId;
@@ -54,12 +54,12 @@ class Question {
       let optionQuery;
       if (DB_MODE.toUpperCase() === "POSTGRES") {
         optionQuery = `
-          INSERT INTO temp_question_option (xue_id, xpt_label, xpt_iscorrect)
+          INSERT INTO question_option (que_id, opt_label, opt_iscorrect)
           VALUES ($1, $2, $3)
         `;
       } else if (DB_MODE.toUpperCase() === "MYSQL") {
         optionQuery = `
-          INSERT INTO temp_question_option (xue_id, xpt_label, xpt_iscorrect)
+          INSERT INTO question_option (que_id, opt_label, opt_iscorrect)
           VALUES (?, ?, ?)
         `;
       }
@@ -80,7 +80,7 @@ class Question {
         JOIN question_type typ ON typ.typ_id = que.typ_id
         JOIN question_topic top ON top.top_id = que.top_id
         JOIN (
-          SELECT que_id AS random_id FROM question ORDER BY random() LIMIT 1
+          SELECT que_id AS random_id FROM question Where que_status = 'VAL' ORDER BY random() LIMIT 1
         ) AS rand ON que.que_id = rand.random_id;
       `;
       const res = await db.query(query);
@@ -95,7 +95,7 @@ class Question {
         JOIN question_type typ ON typ.typ_id = que.typ_id
         JOIN question_topic top ON top.top_id = que.top_id
         JOIN (
-          SELECT que_id AS random_id FROM question ORDER BY RAND() LIMIT 1
+          SELECT que_id AS random_id FROM question Where que_status = 'VAL' ORDER BY RAND() LIMIT 1
         ) AS rand ON que.que_id = rand.random_id;
       `;
       const [rows] = await db.query(query);
@@ -179,14 +179,14 @@ class Question {
     let query;
     let optionQuery;
     if (DB_MODE.toUpperCase() === "POSTGRES") {
-      optionQuery = `DELETE FROM temp_question_option WHERE xue_id = $1`;
+      optionQuery = `DELETE FROM question_option WHERE que_id = $1`;
       await db.query(optionQuery, [this.id]);
-      query = `DELETE FROM temp_question WHERE xue_id = $1`;
+      query = `DELETE FROM question WHERE que_id = $1`;
       await db.query(query, [this.id]);
     } else if (DB_MODE.toUpperCase() === "MYSQL") {
-      optionQuery = `DELETE FROM temp_question_option WHERE xue_id = ?`;
+      optionQuery = `DELETE FROM question_option WHERE que_id = ?`;
       await db.query(optionQuery, [this.id]);
-      query = `DELETE FROM temp_question WHERE xue_id = ?`;
+      query = `DELETE FROM question WHERE que_id = ?`;
       await db.query(query, [this.id]);
     }
   }
@@ -195,46 +195,11 @@ class Question {
     const db = await initClient();
     let query;
     if (DB_MODE.toUpperCase() === "POSTGRES") {
-      query = `INSERT INTO question (que_question, que_desc_response, top_id, typ_id, que_image)
-               SELECT xue_question, xue_desc_response, xop_id, xyp_id, xue_image
-               FROM temp_question
-               WHERE xue_id = $1
-               RETURNING que_id`;
-      const res = await db.query(query, [this.id]);
-      const newQuestionId = res.rows[0].que_id;
-      const optionQuery = `
-        INSERT INTO question_option (que_id, opt_label, opt_iscorrect)
-        SELECT $1, xpt_label, xpt_iscorrect
-        FROM temp_question_option
-        WHERE xue_id = $2`;
-      await db.query(optionQuery, [newQuestionId, [this.id]]);
-      const updateQuery = `UPDATE question_option SET que_id = $1 WHERE que_id = $2`;
-      await db.query(updateQuery, [newQuestionId, this.id]);
-      const deleteOptionQuery = `
-        DELETE FROM temp_question_option WHERE xue_id = $1`;
-      await db.query(deleteOptionQuery, [this.id]);
-      const deleteQuery = `DELETE FROM temp_question WHERE xue_id = $1`;
-      await db.query(deleteQuery, [this.id]);
+      query = `UPDATE question SET que_status = 'VAL' WHERE que_id = $1`;
+      await db.query(query, [this.id]);
     } else if (DB_MODE.toUpperCase() === "MYSQL") {
-      query = `INSERT INTO question (que_question, que_desc_response, top_id, typ_id, que_image)
-               SELECT xue_question, xue_desc_response, xop_id, xyp_id, xue_image
-               FROM temp_question
-               WHERE xue_id = ?`;
-      const [res] = await db.query(query, [this.id]);
-      const newQuestionId = res.insertId;
-      const optionQuery = `
-        INSERT INTO question_option (que_id, opt_label, opt_iscorrect)
-        SELECT ?, xpt_label, xpt_iscorrect
-        FROM temp_question_option
-        WHERE xue_id = ?`;
-      await db.query(optionQuery, [newQuestionId, this.id]);
-      const updateQuery = `UPDATE question_option SET que_id = ? WHERE que_id = ?`;
-      await db.query(updateQuery, [newQuestionId, this.id]);
-      const deleteOptionQuery = `
-        DELETE FROM temp_question_option WHERE xue_id = ?`;
-      await db.query(deleteOptionQuery, [this.id]);
-      const deleteQuery = `DELETE FROM temp_question WHERE xue_id = ?`;
-      await db.query(deleteQuery, [this.id]);
+      query = `UPDATE question SET que_status = 'VAL' WHERE que_id = ?`;
+      await db.query(query, [this.id]);
     }
   }
 
@@ -245,10 +210,11 @@ class Question {
     if (DB_MODE.toUpperCase() === "POSTGRES") {
       query = `
         SELECT *
-        FROM temp_question t
-        JOIN temp_question_option o ON t.xue_id = o.xue_id
-        JOIN temp_question_type ty ON t.xyp_id = ty.xyp_id
-        JOIN temp_question_topic top ON t.xop_id = top.xop_id;
+        FROM question t
+        JOIN question_option o ON t.que_id = o.que_id
+        JOIN question_type ty ON t.typ_id = ty.typ_id
+        JOIN question_topic top ON t.top_id = top.top_id
+        WHERE t.que_status = 'ENC';
       `;
       const res = await db.query(query);
       return Question.groupTempRows(res.rows);
@@ -257,10 +223,11 @@ class Question {
     if (DB_MODE.toUpperCase() === "MYSQL") {
       query = `
         SELECT *
-        FROM temp_question t
-        JOIN temp_question_option o ON t.xue_id = o.xue_id
-        JOIN temp_question_type ty ON t.xyp_id = ty.xyp_id
-        JOIN temp_question_topic top ON t.xop_id = top.xop_id;
+        FROM question t
+        JOIN question_option o ON t.que_id = o.que_id
+        JOIN question_type ty ON t.typ_id = ty.typ_id
+        JOIN question_topic top ON t.top_id = top.top_id
+        WHERE t.que_status = 'ENC';
       `;
       const [rows] = await db.query(query);
       return Question.groupTempRows(rows);
@@ -270,21 +237,21 @@ class Question {
   static groupTempRows(rows) {
   const grouped = {};
   for (const r of rows) {
-    if (!grouped[r.xue_id]) {
-      grouped[r.xue_id] = {
-        id: r.xue_id,
-        question: r.xue_question,
-        desc: r.xue_desc_response,
-        image_link: r.xue_image,
-        topic: { id: r.xop_id, label: r.xop_label },
-        type: { id: r.xyp_id, label: r.xyp_label },
+    if (!grouped[r.que_id]) {
+      grouped[r.que_id] = {
+        id: r.que_id,
+        question: r.que_question,
+        desc: r.que_desc_response,
+        image_link: r.que_image,
+        topic: { id: r.top_id, label: r.top_label },
+        type: { id: r.typ_id, label: r.typ_label },
         options: [],
         response: ""
       };
     }
-    grouped[r.xue_id].options.push(r.xpt_label);
-    if (r.xpt_iscorrect === 1) {
-      grouped[r.xue_id].response = r.xpt_label;
+    grouped[r.que_id].options.push(r.opt_label);
+    if (r.opt_iscorrect === 1) {
+      grouped[r.que_id].response = r.opt_label;
     }
   }
   return Object.values(grouped).map(q =>
