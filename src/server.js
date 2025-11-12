@@ -2,10 +2,11 @@ const express = require("express");
 const http = require("http");
 const { type } = require("os");
 const { Server } = require("socket.io");
-const Question = require("./Question");
-const GameRules = require("./GameRules");
-const { normalizeWord } = require("./tools");
-const { washBDD, DB_MODE, initClient } = require("./dbConnection");
+const Question = require("./models/Question");
+const GameRules = require("./models/GameRules");
+const { normalizeWord } = require("./utils/tools");
+const { washBDD, DB_MODE, initClient } = require("./db/dbConnection");
+//const { sendQuestion, isOver } = require("./controllers/gameController")
 
 const app = express();
 const server = http.createServer(app);
@@ -13,44 +14,50 @@ const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
 });
 
+let rooms = {};
 
-/*-----------------------------------------------------------------------*/
+function isOver(roomId){
+  let room = rooms[roomId];
+  if (!room) return;
+  if (room.gameRules.rules == "ScoreMax") {
+    for (let playerId in room.players) {
+      if (room.players[playerId].score >= room.gameRules.scoreMax) {
+        io.to(roomId).emit("gameOver", room.players);
+        room.nbQuestionsAsked = 0;
+        clearTimeout(room.questionTimeOut)
+        room.started = false;
+        return true;
+      }
+    }
+  }
+  else if (room.gameRules.rules == "FixedQuestions") {
+    if (room.nbQuestionsAsked >= room.gameRules.questionMax) {
+      io.to(roomId).emit("gameOver", room.players);
+      room.nbQuestionsAsked = 0;
+      clearTimeout(room.questionTimeOut)
+      room.started = false;
+      return true;
+    }
+  }
+  return false;
+}
 
 // Envoi des questions aux joueurs de la room
 async function sendQuestion(roomId) {
   let room = rooms[roomId];
   if (!room) return;
-
+  if (!room.started) return; 
+  clearTimeout(room.questionTimeOut);
+  room.answeredPlayers = 0;
   room.question_now = await Question.getRandomQuestion();
+  room.nbQuestionsAsked += 1;
   let q = room.question_now;
-  //console.log(q.question);
-  //console.log(room.gameRules.rules);
-  if (room.gameRules.rules == "ScoreMax") {
-    for (let playerId in room.players) {
-      //console.log(room.players[playerId].score);
-      if (room.players[playerId].score >= room.gameRules.scoreMax) {
-        io.to(roomId).emit("gameOver", room.players);
-        room.nbQuestionsAsked = 0;
-        return;
-      }
-    }
-  }
-  else if (room.gameRules.rules == "FixedQuestions") {
-    //console.log(room.nbQuestionsAsked, room.gameRules.questionMax);
-    if (room.nbQuestionsAsked >= room.gameRules.questionMax) {
-      io.to(roomId).emit("gameOver", room.players);
-      room.nbQuestionsAsked = 0;
-      return;
-    }
-  }
-
   let timeLimit = 5;
   if (q.type === "qcm") {
     timeLimit = room.gameRules.qcmTimeLimit || 8;
   } else if (q.type === "open") {
     timeLimit = room.gameRules.openTimeLimit || 12;
   }
-  
   io.to(roomId).emit("newQuestion", {
     question: q.question,
     options: q.options,
@@ -60,16 +67,12 @@ async function sendQuestion(roomId) {
     desc: q.desc,
     image_link: q.image_link
   });
-
-  room.nbQuestionsAsked++;
-
-  setTimeout(() => {
-    rooms[roomId].currentQuestionIndex++;
+  room.questionTimeOut = setTimeout(() => {
+    isOver(roomId);
     sendQuestion(roomId);
   }, timeLimit * 1000 + 4000);
+  return timeLimit;
 }
-
-let rooms = {};
 
 /*-----------------------------------------------------------------------*/
 
@@ -87,15 +90,14 @@ io.on("connection", (socket) => {
         readyPlayers: {},
         question_now: null,
         nbQuestionsAsked: 0,
-        gameRules: null
+        gameRules: null,
+        answeredPlayers: 0,
+        questionTimeOut: null
       };
     }
-
     rooms[roomId].players[socket.id] = { name: playerName, score: 0 };
     rooms[roomId].readyPlayers[socket.id] = false;
-    //console.log(rooms);
     socket.join(roomId);
-
     io.to(roomId).emit("updatePlayers", rooms[roomId]);
   });
 
@@ -108,8 +110,8 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("gameStarting");
   });
 
-  // Attente des joueurs prêts
-  socket.on("ready", (roomId) => {
+  // Attente des joueurs prêts, puis envoi de la première question
+  socket.on("ready", async (roomId) => {
     let room = rooms[roomId];
     if (!room) return;
 
@@ -118,7 +120,8 @@ io.on("connection", (socket) => {
     if (allReady && !room.started) {
       room.started = true;
       room.currentQuestionIndex = 0;
-      sendQuestion(roomId);
+      isOver(roomId);
+      room.timeLimit = await sendQuestion(roomId);
     }
   });
 
@@ -130,6 +133,20 @@ io.on("connection", (socket) => {
     let q = rooms[roomId].question_now;
     if (answer === normalizeWord(q.response)) {
       room.players[socket.id].score += 1;
+    }
+    room.answeredPlayers = room.answeredPlayers + 1;
+    if (room.answeredPlayers >= Object.keys(room.players).length) {
+      clearTimeout(room.questionTimeOut);
+      io.to(roomId).emit("showAnswer", {
+        response: q.response,
+        desc: q.desc,
+        image_link: q.image_link
+      });
+
+      setTimeout(() => {
+        isOver(roomId);
+        sendQuestion(roomId);
+      }, 4000); 
     }
   });
 
@@ -149,6 +166,7 @@ io.on("connection", (socket) => {
     }
   });
 
+  // ajout d'une question en BDD
   socket.on("addQuestion", async (questionData, callback) => {
     try {
       const question = new Question(
@@ -161,7 +179,6 @@ io.on("connection", (socket) => {
         questionData.type.label, 
         questionData.image_link
       );
-      //console.log("Nouvelle question créée :", question);
       await question.save(questionData.topic.id, questionData.type.id);
       io.emit("questionAdded", question);
       callback({ success: true });
@@ -170,6 +187,7 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Envoi des type et topics pour la création de questions
   socket.on("getTopicsAndTypes", async () => {
     try {
       const topics = await Question.getAllTopics();
@@ -180,6 +198,7 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Rejet d'une question par l'admin, suppression en BDD
   socket.on("deleteQuestion", async (questionId) => {
     try {
       const question = new Question();
@@ -192,6 +211,7 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Acceptation d'une question par l'admin
   socket.on("validateQuestion", async (questionId) => {
     try {
       const question = new Question();
@@ -204,6 +224,7 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Récupération de toutes les questions non validées
   socket.on("getTempQuestions", async () => {
     const questions = await Question.getAllTempQuestions();
     socket.emit("tempQuestions", questions);

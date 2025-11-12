@@ -1,4 +1,4 @@
-const { initClient, DB_MODE } = require("./dbConnection");
+const { initClient, DB_MODE } = require("../db/dbConnection");
 
 class Question {
   constructor(id, question, options, response, desc, topic, type, image_link) {
