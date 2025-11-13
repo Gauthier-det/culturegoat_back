@@ -6,12 +6,14 @@ const Question = require("./models/Question");
 const GameRules = require("./models/GameRules");
 const { normalizeWord } = require("./utils/tools");
 const { washBDD, DB_MODE, initClient } = require("./db/dbConnection");
-//const { sendQuestion, isOver } = require("./controllers/gameController")
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] },
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  },
 });
 
 let rooms = {};
@@ -19,45 +21,51 @@ let rooms = {};
 function isOver(roomId){
   let room = rooms[roomId];
   if (!room) return;
+  
   if (room.gameRules.rules == "ScoreMax") {
     for (let playerId in room.players) {
       if (room.players[playerId].score >= room.gameRules.scoreMax) {
         io.to(roomId).emit("gameOver", room.players);
         room.nbQuestionsAsked = 0;
-        clearTimeout(room.questionTimeOut)
+        clearTimeout(room.questionTimeOut);
         room.started = false;
+        room.isGameOver = true; // Marquer que la partie est terminée
         return true;
       }
     }
-  }
-  else if (room.gameRules.rules == "FixedQuestions") {
+  } else if (room.gameRules.rules == "FixedQuestions") {
     if (room.nbQuestionsAsked >= room.gameRules.questionMax) {
       io.to(roomId).emit("gameOver", room.players);
       room.nbQuestionsAsked = 0;
-      clearTimeout(room.questionTimeOut)
+      clearTimeout(room.questionTimeOut);
       room.started = false;
+      room.isGameOver = true; // Marquer que la partie est terminée
       return true;
     }
   }
   return false;
 }
 
-// Envoi des questions aux joueurs de la room
 async function sendQuestion(roomId) {
   let room = rooms[roomId];
   if (!room) return;
-  if (!room.started) return; 
+  if (!room.started) return;
+  
   clearTimeout(room.questionTimeOut);
   room.answeredPlayers = 0;
+  room.answeredPlayersList = {}; // Track qui a répondu
   room.question_now = await Question.getRandomQuestion();
   room.nbQuestionsAsked += 1;
+  
   let q = room.question_now;
   let timeLimit = 5;
+  
   if (q.type === "qcm") {
     timeLimit = room.gameRules.qcmTimeLimit || 8;
   } else if (q.type === "open") {
     timeLimit = room.gameRules.openTimeLimit || 12;
   }
+  
   io.to(roomId).emit("newQuestion", {
     question: q.question,
     options: q.options,
@@ -67,18 +75,18 @@ async function sendQuestion(roomId) {
     desc: q.desc,
     image_link: q.image_link
   });
+  
   room.questionTimeOut = setTimeout(() => {
     isOver(roomId);
     sendQuestion(roomId);
   }, timeLimit * 1000 + 4000);
+  
   return timeLimit;
 }
 
-/*-----------------------------------------------------------------------*/
-
 io.on("connection", (socket) => {
-
-  //Création ou rejoindre une room
+  
+  // Rejoindre ou créer une room (modifié pour gérer les parties en cours)
   socket.on("joinRoom", ({ roomId, playerName }) => {
     if (!rooms[roomId]) {
       console.log("Nouveau joueur :", socket.id, " dans la room :", roomId);
@@ -92,31 +100,91 @@ io.on("connection", (socket) => {
         nbQuestionsAsked: 0,
         gameRules: null,
         answeredPlayers: 0,
-        questionTimeOut: null
+        answeredPlayersList: {},
+        questionTimeOut: null,
+        isGameOver: false,
+        rematchCountdown: null
       };
     }
-    rooms[roomId].players[socket.id] = { name: playerName, score: 0 };
-    rooms[roomId].readyPlayers[socket.id] = false;
+    
+    // Vérifier si le joueur existait déjà (reconnexion)
+    let existingPlayer = null;
+    for (let playerId in rooms[roomId].players) {
+      if (rooms[roomId].players[playerId].name === playerName) {
+        existingPlayer = playerId;
+        break;
+      }
+    }
+    
+    if (existingPlayer && existingPlayer !== socket.id) {
+      // Reconnexion : transférer le score
+      console.log(`Reconnexion de ${playerName} (ancien: ${existingPlayer}, nouveau: ${socket.id})`);
+      rooms[roomId].players[socket.id] = {
+        name: rooms[roomId].players[existingPlayer].name,
+        score: rooms[roomId].players[existingPlayer].score
+      };
+      delete rooms[roomId].players[existingPlayer];
+      
+      if (rooms[roomId].readyPlayers[existingPlayer] !== undefined) {
+        rooms[roomId].readyPlayers[socket.id] = rooms[roomId].readyPlayers[existingPlayer];
+        delete rooms[roomId].readyPlayers[existingPlayer];
+      }
+      
+      // Si l'ancien joueur était l'host
+      if (rooms[roomId].host === existingPlayer) {
+        rooms[roomId].host = socket.id;
+      }
+    } else if (!rooms[roomId].players[socket.id]) {
+      // Nouveau joueur
+      rooms[roomId].players[socket.id] = {
+        name: playerName,
+        score: 0
+      };
+      rooms[roomId].readyPlayers[socket.id] = false;
+    }
+    
     socket.join(roomId);
-    io.to(roomId).emit("updatePlayers", rooms[roomId]);
+    
+    // Si la partie a déjà commencé, informer le joueur
+    if (rooms[roomId].started) {
+      socket.emit("gameAlreadyStarted", {
+        question: rooms[roomId].question_now,
+        players: rooms[roomId].players
+      });
+      
+      // Marquer comme prêt automatiquement
+      rooms[roomId].readyPlayers[socket.id] = true;
+    }
+    
+    // Envoyer uniquement les données nécessaires (pas tout l'objet room)
+    io.to(roomId).emit("updatePlayers", {
+      players: rooms[roomId].players,
+      host: rooms[roomId].host,
+      started: rooms[roomId].started
+    });
   });
 
-  // Mise en place de la partie
   socket.on("prepareGame", (data) => {
     const roomId = data.roomId;
     const rules = data.rules;
-    let gameRules = new GameRules(rules.rulesOption, rules.scoreMax, rules.qcmTimeLimit, rules.openTimeLimit, rules.questionMax);
+    let gameRules = new GameRules(
+      rules.rulesOption,
+      rules.scoreMax,
+      rules.qcmTimeLimit,
+      rules.openTimeLimit,
+      rules.questionMax
+    );
     rooms[roomId].gameRules = gameRules;
     io.to(roomId).emit("gameStarting");
   });
 
-  // Attente des joueurs prêts, puis envoi de la première question
   socket.on("ready", async (roomId) => {
     let room = rooms[roomId];
     if (!room) return;
-
+    
     room.readyPlayers[socket.id] = true;
     const allReady = Object.values(room.readyPlayers).every((v) => v);
+    
     if (allReady && !room.started) {
       room.started = true;
       room.currentQuestionIndex = 0;
@@ -125,16 +193,22 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Traitement des réponses
   socket.on("answer", ({ roomId, answer }) => {
     let room = rooms[roomId];
     if (!room) return;
-
+    
+    if (room.answeredPlayersList[socket.id]) {
+      return;
+    }
+    
     let q = rooms[roomId].question_now;
     if (answer === normalizeWord(q.response)) {
       room.players[socket.id].score += 1;
     }
+    
+    room.answeredPlayersList[socket.id] = true;
     room.answeredPlayers = room.answeredPlayers + 1;
+    
     if (room.answeredPlayers >= Object.keys(room.players).length) {
       clearTimeout(room.questionTimeOut);
       io.to(roomId).emit("showAnswer", {
@@ -142,45 +216,61 @@ io.on("connection", (socket) => {
         desc: q.desc,
         image_link: q.image_link
       });
-
+      
       setTimeout(() => {
         isOver(roomId);
         sendQuestion(roomId);
-      }, 4000); 
+      }, 4000);
     }
   });
 
-  // Déconnexion
   socket.on("disconnect", () => {
     for (let roomId in rooms) {
       let room = rooms[roomId];
       if (room.players[socket.id]) {
-        let newHostId = null;
-        delete room.players[socket.id];
-        if (socket.id === room.host) {
-          room.host = null;
-          if(Object.keys(room.players).length != 0){
-            newHostId = Object.keys(room.players)[0];
-            room.host = newHostId;
+        // Ne pas supprimer immédiatement si la partie est en cours
+        if (room.started) {
+          // On garde le joueur dans la liste mais on note qu'il est déconnecté
+          room.players[socket.id].disconnected = true;
+          
+          io.to(roomId).emit("updatePlayers", {
+            players: room.players,
+            host: room.host,
+            started: room.started
+          });
+        } else {
+          let newHostId = null;
+          delete room.players[socket.id];
+          delete room.readyPlayers[socket.id];
+          
+          if (socket.id === room.host) {
+            room.host = null;
+            if(Object.keys(room.players).length != 0){
+              newHostId = Object.keys(room.players)[0];
+              room.host = newHostId;
+            }
           }
+          
+          io.to(roomId).emit("updatePlayers", {
+            players: room.players,
+            host: room.host,
+            started: room.started
+          }, newHostId);
         }
-        const players = room.players;
-        io.to(roomId).emit("updatePlayers", players, newHostId);
       }
     }
   });
 
-  // ajout d'une question en BDD
   socket.on("addQuestion", async (questionData, callback) => {
     try {
       const question = new Question(
-        null, 
+        null,
         questionData.question,
         questionData.options,
         questionData.response,
         questionData.desc,
-        questionData.topic.label, 
-        questionData.type.label, 
+        questionData.topic.label,
+        questionData.type.label,
         questionData.image_link
       );
       await question.save(questionData.topic.id, questionData.type.id);
@@ -191,7 +281,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Envoi des type et topics pour la création de questions
   socket.on("getTopicsAndTypes", async () => {
     try {
       const topics = await Question.getAllTopics();
@@ -202,7 +291,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Rejet d'une question par l'admin, suppression en BDD
   socket.on("deleteQuestion", async (questionId) => {
     try {
       const question = new Question();
@@ -215,7 +303,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Acceptation d'une question par l'admin
   socket.on("validateQuestion", async (questionId) => {
     try {
       const question = new Question();
@@ -228,16 +315,59 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Récupération de toutes les questions non validées
   socket.on("getTempQuestions", async () => {
     const questions = await Question.getAllTempQuestions();
     socket.emit("tempQuestions", questions);
   });
 
+  // Demande de rematch
+  socket.on("requestRematch", (roomId) => {
+    let room = rooms[roomId];
+    if (!room || !room.isGameOver) return;
+
+    // Réinitialiser les scores des joueurs
+    for (let playerId in room.players) {
+      room.players[playerId].score = 0;
+      room.players[playerId].disconnected = false;
+    }
+
+    room.readyPlayers = {};
+    for (let playerId in room.players) {
+      room.readyPlayers[playerId] = false;
+    }
+    room.nbQuestionsAsked = 0;
+    room.currentQuestionIndex = 0;
+    room.question_now = null;
+    room.answeredPlayers = 0;
+    room.answeredPlayersList = {};
+    room.isGameOver = false;
+    room.started = false;
+
+    io.to(roomId).emit("rematchStarting", {
+      countdown: 5,
+      players: room.players
+    });
+
+    let countdown = 5;
+    clearInterval(room.rematchCountdown);
+    
+    room.rematchCountdown = setInterval(() => {
+      countdown--;
+      io.to(roomId).emit("rematchCountdown", countdown);
+
+      if (countdown <= 0) {
+        clearInterval(room.rematchCountdown);
+        room.rematchCountdown = null;
+        for (let playerId in room.players) {
+          room.readyPlayers[playerId] = true;
+        }
+        room.started = true;
+        sendQuestion(roomId);
+      }
+    }, 1000);
+  });
 });
 
 server.listen(3001, () => {
   console.log("Serveur lancé sur http://localhost:3001");
 });
-
-/*-----------------------------------------------------------------------*/
