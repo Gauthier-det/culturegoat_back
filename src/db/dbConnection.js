@@ -1,6 +1,7 @@
 require("dotenv").config();
 const { Client: PGClient } = require("pg");
 const mysql = require("mysql2/promise");
+const fs = require('fs');
 
 const DB_MODE = process.env.DB_MODE || "POSTGRES";
 const DB_HOST_PG = process.env.DB_HOST_PG;
@@ -20,7 +21,10 @@ async function initClient() {
   if (DB_MODE.toUpperCase() === "POSTGRES") {
     client = new PGClient({
       connectionString: DB_HOST_PG,
-      ssl: { rejectUnauthorized: false },
+      ssl: { 
+        rejectUnauthorized: false,
+        ca: fs.readFileSync('./ca.pem').toString()
+       },
     });
     await client.connect();
     console.log("✅ PostgreSQL connected");
