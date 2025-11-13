@@ -18,11 +18,11 @@ INSERT INTO `question_topic` (`top_id`, `top_label`) VALUES
 -- Dumping data for table `question`
 --
 
-INSERT INTO `question` (`que_id`, `que_question`, `que_desc_response`, `que_image`, `top_id`, `typ_id`) VALUES
-(1, 'En quelle année est sorti l\'album Or Noir de Kaaris ?', 'Or Noir, sorti en 2013, fût une révolution dans la trap et plus particulièrement dans le rap français.', NULL, 1, 2),
-(2, 'Quel rappeur sort tous les sons qu\'il ne garde pas dans ses albums sous forme de mixtape poubelle ?', 'La Fève sors régulièrement des projets Empty the bin, souvent très longs et avec tout un tas de morceaux exclusifs !', NULL, 1, 1),
-(3, 'Qui a écrit le roman intitulé \"L\'immortalité\" ?', 'C\'est en effet Milan Kundera, auteur tchéquo-français du 20e siècle.', NULL, 2, 1),
-(4, 'Quel est le nom du troisième projet de SCH ?', 'Deo Favente est sorti en 2017, juste avant le très célèbre JVLIVS', NULL, 1, 2);
+INSERT INTO `question` (`que_id`, `que_question`, `que_desc_response`, `que_image`, `top_id`, `typ_id`,`que_status`) VALUES
+(1, 'En quelle année est sorti l\'album Or Noir de Kaaris ?', 'Or Noir, sorti en 2013, fût une révolution dans la trap et plus particulièrement dans le rap français.', NULL, 1, 2,'VAL'),
+(2, 'Quel rappeur sort tous les sons qu\'il ne garde pas dans ses albums sous forme de mixtape poubelle ?', 'La Fève sors régulièrement des projets Empty the bin, souvent très longs et avec tout un tas de morceaux exclusifs !', NULL, 1, 1,'VAL'),
+(3, 'Qui a écrit le roman intitulé \"L\'immortalité\" ?', 'C\'est en effet Milan Kundera, auteur tchéquo-français du 20e siècle.', NULL, 2, 1,'VAL'),
+(4, 'Quel est le nom du troisième projet de SCH ?', 'Deo Favente est sorti en 2017, juste avant le très célèbre JVLIVS', NULL, 1, 2,'VAL');
 
 -- --------------------------------------------------------
 
