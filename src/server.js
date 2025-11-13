@@ -158,10 +158,14 @@ io.on("connection", (socket) => {
         let newHostId = null;
         delete room.players[socket.id];
         if (socket.id === room.host) {
-          newHostId = Object.keys(room.players)[0];
-          room.host = newHostId;
+          room.host = null;
+          if(Object.keys(room.players).length != 0){
+            newHostId = Object.keys(room.players)[0];
+            room.host = newHostId;
+          }
         }
-        io.to(roomId).emit("updatePlayers", room, newHostId);
+        const players = room.players;
+        io.to(roomId).emit("updatePlayers", players, newHostId);
       }
     }
   });
@@ -232,8 +236,8 @@ io.on("connection", (socket) => {
 
 });
 
-server.listen(3000, () => {
-  console.log("Serveur lancé sur http://localhost:3000");
+server.listen(3001, () => {
+  console.log("Serveur lancé sur http://localhost:3001");
 });
 
 /*-----------------------------------------------------------------------*/
