@@ -27,8 +27,9 @@ function isOver(roomId){
       if (room.players[playerId].score >= room.gameRules.scoreMax) {
         io.to(roomId).emit("gameOver", room.players);
         room.nbQuestionsAsked = 0;
-        clearTimeout(room.questionTimeOut)
+        clearTimeout(room.questionTimeOut);
         room.started = false;
+        room.isGameOver = true; // Marquer que la partie est terminée
         return true;
       }
     }
@@ -36,8 +37,9 @@ function isOver(roomId){
     if (room.nbQuestionsAsked >= room.gameRules.questionMax) {
       io.to(roomId).emit("gameOver", room.players);
       room.nbQuestionsAsked = 0;
-      clearTimeout(room.questionTimeOut)
+      clearTimeout(room.questionTimeOut);
       room.started = false;
+      room.isGameOver = true; // Marquer que la partie est terminée
       return true;
     }
   }
@@ -99,7 +101,9 @@ io.on("connection", (socket) => {
         gameRules: null,
         answeredPlayers: 0,
         answeredPlayersList: {},
-        questionTimeOut: null
+        questionTimeOut: null,
+        isGameOver: false,
+        rematchCountdown: null
       };
     }
     
@@ -193,7 +197,6 @@ io.on("connection", (socket) => {
     let room = rooms[roomId];
     if (!room) return;
     
-    // Empêcher les réponses multiples
     if (room.answeredPlayersList[socket.id]) {
       return;
     }
@@ -225,22 +228,17 @@ io.on("connection", (socket) => {
     for (let roomId in rooms) {
       let room = rooms[roomId];
       if (room.players[socket.id]) {
-        console.log(`Joueur ${socket.id} déconnecté de la room ${roomId}`);
-        
         // Ne pas supprimer immédiatement si la partie est en cours
         if (room.started) {
-          console.log("Partie en cours, le joueur peut se reconnecter");
           // On garde le joueur dans la liste mais on note qu'il est déconnecté
           room.players[socket.id].disconnected = true;
           
-          // Envoyer les données nettoyées
           io.to(roomId).emit("updatePlayers", {
             players: room.players,
             host: room.host,
             started: room.started
           });
         } else {
-          // Si la partie n'a pas commencé, on peut supprimer
           let newHostId = null;
           delete room.players[socket.id];
           delete room.readyPlayers[socket.id];
@@ -320,6 +318,53 @@ io.on("connection", (socket) => {
   socket.on("getTempQuestions", async () => {
     const questions = await Question.getAllTempQuestions();
     socket.emit("tempQuestions", questions);
+  });
+
+  // Demande de rematch
+  socket.on("requestRematch", (roomId) => {
+    let room = rooms[roomId];
+    if (!room || !room.isGameOver) return;
+
+    // Réinitialiser les scores des joueurs
+    for (let playerId in room.players) {
+      room.players[playerId].score = 0;
+      room.players[playerId].disconnected = false;
+    }
+
+    room.readyPlayers = {};
+    for (let playerId in room.players) {
+      room.readyPlayers[playerId] = false;
+    }
+    room.nbQuestionsAsked = 0;
+    room.currentQuestionIndex = 0;
+    room.question_now = null;
+    room.answeredPlayers = 0;
+    room.answeredPlayersList = {};
+    room.isGameOver = false;
+    room.started = false;
+
+    io.to(roomId).emit("rematchStarting", {
+      countdown: 5,
+      players: room.players
+    });
+
+    let countdown = 5;
+    clearInterval(room.rematchCountdown);
+    
+    room.rematchCountdown = setInterval(() => {
+      countdown--;
+      io.to(roomId).emit("rematchCountdown", countdown);
+
+      if (countdown <= 0) {
+        clearInterval(room.rematchCountdown);
+        room.rematchCountdown = null;
+        for (let playerId in room.players) {
+          room.readyPlayers[playerId] = true;
+        }
+        room.started = true;
+        sendQuestion(roomId);
+      }
+    }, 1000);
   });
 });
 
