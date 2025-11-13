@@ -36,7 +36,8 @@ CREATE TABLE `question` (
   `que_desc_response` char(255) DEFAULT NULL,
   `que_image` char(128) DEFAULT NULL,
   `top_id` int NOT NULL,
-  `typ_id` int NOT NULL
+  `typ_id` int NOT NULL,
+  `que_status` char(3) NOT NULL 
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 ;
 
 
@@ -62,7 +63,7 @@ CREATE TABLE `question_option` (
 
 DROP TABLE IF EXISTS `question_topic`;
 CREATE TABLE `question_topic` (
-  `top_id` int NOT NULL,
+  `TOP_ID` int NOT NULL,
   `top_label` char(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 ;
 
@@ -91,7 +92,7 @@ CREATE TABLE `question_type` (
 --
 ALTER TABLE `question`
   ADD PRIMARY KEY (`que_id`),
-  ADD KEY `top_id` (`top_id`),
+  ADD KEY `QUE_TOP_FK` (`top_id`),
   ADD KEY `QUE_TYP_FK` (`typ_id`);
 
 --
@@ -99,7 +100,7 @@ ALTER TABLE `question`
 --
 ALTER TABLE `question_option`
   ADD PRIMARY KEY (`opt_id`),
-  ADD KEY `OPT_QUE` (`que_id`);
+  ADD KEY `OPT_QUE_FK` (`que_id`);
 
 --
 -- Indexes for table `question_topic`
