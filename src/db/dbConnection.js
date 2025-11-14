@@ -24,6 +24,7 @@ async function initClient() {
       ssl: {
         rejectUnauthorized: true,
         ca: process.env.PGSSLROOTCERT
+      }
     });
     await client.connect();
     console.log("✅ PostgreSQL connected");
