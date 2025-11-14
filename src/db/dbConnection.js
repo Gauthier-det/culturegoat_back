@@ -22,7 +22,7 @@ async function initClient() {
     client = new PGClient({
       connectionString: DB_HOST_PG,
       ssl: { 
-        rejectUnauthorized: false,
+        rejectUnauthorized: true,
         ca: fs.readFileSync('./src/db/ca.pem')
        },
     });
