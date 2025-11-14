@@ -23,7 +23,7 @@ async function initClient() {
       connectionString: DB_HOST_PG,
       ssl: { 
         rejectUnauthorized: false,
-        ca: fs.readfile('./src/db/ca.pem')
+        ca: fs.readFileSync('./src/db/ca.pem')
        },
     });
     await client.connect();
