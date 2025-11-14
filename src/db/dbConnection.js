@@ -21,9 +21,7 @@ async function initClient() {
   if (DB_MODE.toUpperCase() === "POSTGRES") {
     client = new PGClient({
       connectionString: DB_HOST_PG,
-      ssl: { 
-        rejectUnauthorized: false
-       },
+      ssl: { true,
     });
     await client.connect();
     console.log("✅ PostgreSQL connected");
