@@ -18,6 +18,7 @@ const io = new Server(server, {
 
 let rooms = {};
 
+// Vérifie si la partie est terminée selon les règles définies
 function isOver(roomId){
   let room = rooms[roomId];
   if (!room) return;
@@ -27,9 +28,9 @@ function isOver(roomId){
       if (room.players[playerId].score >= room.gameRules.scoreMax) {
         io.to(roomId).emit("gameOver", room.players);
         room.nbQuestionsAsked = 0;
-        clearTimeout(room.questionTimeOut);
+        clearTimeout(room.questionTimeOut); 
         room.started = false;
-        room.isGameOver = true; // Marquer que la partie est terminée
+        room.isGameOver = true; 
         return true;
       }
     }
@@ -39,33 +40,57 @@ function isOver(roomId){
       room.nbQuestionsAsked = 0;
       clearTimeout(room.questionTimeOut);
       room.started = false;
-      room.isGameOver = true; // Marquer que la partie est terminée
+      room.isGameOver = true; 
       return true;
     }
   }
   return false;
 }
 
+// Envoi d'une nouvelle question à la room
 async function sendQuestion(roomId) {
   let room = rooms[roomId];
+
+  //Vérification que la room existe et que la partie est en cours
   if (!room) return;
   if (!room.started) return;
-  
   clearTimeout(room.questionTimeOut);
+
+  //Définition des varibles utiles
+  const selectedTopics = room.gameRules.selectedTopics;
+  const totalQuestions = await Question.getNbQuestion(
+    selectedTopics && selectedTopics.length > 0 ? selectedTopics : null
+  );
+
+  //Définition de la question actuelle et initialisation des compteurs
   room.answeredPlayers = 0;
-  room.answeredPlayersList = {}; // Track qui a répondu
-  room.question_now = await Question.getRandomQuestion();
+  room.answeredPlayersList = {}; 
+  room.question_now = await Question.getRandomQuestion(
+    selectedTopics && selectedTopics.length > 0 ? selectedTopics : null
+  );
+  
+  // Assurer que la question n'a pas déjà été posée
+  if (room.questionsAsked.length == totalQuestions) {
+    room.questionsAsked = [];
+  }
+  while (room.questionsAsked.includes(room.question_now.id)) {
+    room.question_now = await Question.getRandomQuestion(
+      selectedTopics && selectedTopics.length > 0 ? selectedTopics : null
+    );
+  }
+  room.questionsAsked.push(room.question_now.id);
   room.nbQuestionsAsked += 1;
   
+  // Définition du temps imparti en fonction du type de question
   let q = room.question_now;
   let timeLimit = 5;
-  
   if (q.type === "qcm") {
     timeLimit = room.gameRules.qcmTimeLimit || 8;
   } else if (q.type === "open") {
     timeLimit = room.gameRules.openTimeLimit || 12;
   }
   
+  // Envoi de la question à la room
   io.to(roomId).emit("newQuestion", {
     question: q.question,
     options: q.options,
@@ -73,9 +98,10 @@ async function sendQuestion(roomId) {
     time: timeLimit + 4,
     response: q.response,
     desc: q.desc,
-    image_link: q.image_link
+    image_link: q.image_link,
   });
   
+  // Démarrage du timer pour la question
   room.questionTimeOut = setTimeout(() => {
     isOver(roomId);
     sendQuestion(roomId);
@@ -84,10 +110,12 @@ async function sendQuestion(roomId) {
   return timeLimit;
 }
 
+// Gestion des connexions Socket.io
 io.on("connection", (socket) => {
   
-  // Rejoindre ou créer une room (modifié pour gérer les parties en cours)
+  // Rejoindre ou créer une room 
   socket.on("joinRoom", ({ roomId, playerName }) => {
+    // Créer la room si elle n'existe pas
     if (!rooms[roomId]) {
       console.log("Nouveau joueur :", socket.id, " dans la room :", roomId);
       rooms[roomId] = {
@@ -103,7 +131,8 @@ io.on("connection", (socket) => {
         answeredPlayersList: {},
         questionTimeOut: null,
         isGameOver: false,
-        rematchCountdown: null
+        rematchCountdown: null,
+        questionsAsked: []
       };
     }
     
@@ -116,8 +145,8 @@ io.on("connection", (socket) => {
       }
     }
     
+    // Gérer la reconnexion ou l'ajout d'un nouveau joueur
     if (existingPlayer && existingPlayer !== socket.id) {
-      // Reconnexion : transférer le score
       console.log(`Reconnexion de ${playerName} (ancien: ${existingPlayer}, nouveau: ${socket.id})`);
       rooms[roomId].players[socket.id] = {
         name: rooms[roomId].players[existingPlayer].name,
@@ -135,7 +164,6 @@ io.on("connection", (socket) => {
         rooms[roomId].host = socket.id;
       }
     } else if (!rooms[roomId].players[socket.id]) {
-      // Nouveau joueur
       rooms[roomId].players[socket.id] = {
         name: playerName,
         score: 0
@@ -143,20 +171,20 @@ io.on("connection", (socket) => {
       rooms[roomId].readyPlayers[socket.id] = false;
     }
     
+    // Rejoindre la room Socket.io
     socket.join(roomId);
     
-    // Si la partie a déjà commencé, informer le joueur
+    // Informer le joueur si la partie a déjà commencé
     if (rooms[roomId].started) {
       socket.emit("gameAlreadyStarted", {
         question: rooms[roomId].question_now,
         players: rooms[roomId].players
       });
       
-      // Marquer comme prêt automatiquement
       rooms[roomId].readyPlayers[socket.id] = true;
     }
     
-    // Envoyer uniquement les données nécessaires (pas tout l'objet room)
+    // Mettre à jour la liste des joueurs dans la room
     io.to(roomId).emit("updatePlayers", {
       players: rooms[roomId].players,
       host: rooms[roomId].host,
@@ -164,20 +192,25 @@ io.on("connection", (socket) => {
     });
   });
 
+  // Préparation de la partie avec les règles définies
   socket.on("prepareGame", (data) => {
     const roomId = data.roomId;
     const rules = data.rules;
+
+    // Créer les règles de jeu
     let gameRules = new GameRules(
       rules.rulesOption,
       rules.scoreMax,
       rules.qcmTimeLimit,
       rules.openTimeLimit,
-      rules.questionMax
+      rules.questionMax,
+      rules.selectedTopics
     );
     rooms[roomId].gameRules = gameRules;
     io.to(roomId).emit("gameStarting");
   });
 
+  // Joueur prêt
   socket.on("ready", async (roomId) => {
     let room = rooms[roomId];
     if (!room) return;
@@ -193,6 +226,7 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Réception d'une réponse d'un joueur
   socket.on("answer", ({ roomId, answer }) => {
     let room = rooms[roomId];
     if (!room) return;
@@ -201,6 +235,7 @@ io.on("connection", (socket) => {
       return;
     }
     
+    // Vérifier la réponse
     let q = rooms[roomId].question_now;
     if (answer === normalizeWord(q.response)) {
       room.players[socket.id].score += 1;
@@ -209,6 +244,7 @@ io.on("connection", (socket) => {
     room.answeredPlayersList[socket.id] = true;
     room.answeredPlayers = room.answeredPlayers + 1;
     
+    // Vérifier si tous les joueurs ont répondu, le cas échéant, ignorer le timer de base et passer à la réponse
     if (room.answeredPlayers >= Object.keys(room.players).length) {
       clearTimeout(room.questionTimeOut);
       io.to(roomId).emit("showAnswer", {
@@ -224,6 +260,7 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Gestion de la déconnexion d'un joueur
   socket.on("disconnect", () => {
     for (let roomId in rooms) {
       let room = rooms[roomId];
@@ -261,6 +298,7 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Ajout d'une nouvelle question
   socket.on("addQuestion", async (questionData, callback) => {
     try {
       const question = new Question(
@@ -274,6 +312,8 @@ io.on("connection", (socket) => {
         questionData.image_link
       );
       await question.save(questionData.topic.id, questionData.type.id);
+
+      // Informer le client que la question a été ajoutée avec succès
       io.emit("questionAdded", question);
       callback({ success: true });
     } catch (error) {
@@ -281,6 +321,7 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Récupération des sujets et types de questions
   socket.on("getTopicsAndTypes", async () => {
     try {
       const topics = await Question.getAllTopics();
@@ -291,6 +332,7 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Rejeter une question
   socket.on("deleteQuestion", async (questionId) => {
     try {
       const question = new Question();
@@ -303,6 +345,7 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Valider une question
   socket.on("validateQuestion", async (questionId) => {
     try {
       const question = new Question();
@@ -315,6 +358,7 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Récupération des questions en attente de validation
   socket.on("getTempQuestions", async () => {
     const questions = await Question.getAllTempQuestions();
     socket.emit("tempQuestions", questions);

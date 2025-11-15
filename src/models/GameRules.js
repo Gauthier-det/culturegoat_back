@@ -1,10 +1,12 @@
 class GameRules {
-    constructor(rules, scoreMax, qcmTimeLimit, openTimeLimit, questionMax) {
-        this.rules = rules,
-        this.scoreMax = scoreMax,
-        this.qcmTimeLimit = qcmTimeLimit,
-        this.openTimeLimit = openTimeLimit,
-        this.questionMax = questionMax
+    constructor(rules, scoreMax, qcmTimeLimit, openTimeLimit, questionMax, selectedTopics) {
+        this.rules = rules;
+        this.scoreMax = scoreMax;
+        this.qcmTimeLimit = qcmTimeLimit;
+        this.openTimeLimit = openTimeLimit;
+        this.questionMax = questionMax;
+        this.selectedTopics = selectedTopics || [];
+
     }
 }
 
