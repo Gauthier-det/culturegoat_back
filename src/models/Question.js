@@ -68,38 +68,80 @@ class Question {
     } 
   }
 
-  static async getRandomQuestion() {
+  static async getRandomQuestion(topicIds = null) {
     const db = await initClient();
 
     let query;
     if (DB_MODE.toUpperCase() === "POSTGRES") {
-      query = `
-        SELECT * 
-        FROM question que
-        JOIN question_option opt ON que.que_id = opt.que_id
-        JOIN question_type typ ON typ.typ_id = que.typ_id
-        JOIN question_topic top ON top.top_id = que.top_id
-        JOIN (
-          SELECT que_id AS random_id FROM question Where que_status = 'VAL' ORDER BY random() LIMIT 1
-        ) AS rand ON que.que_id = rand.random_id;
-      `;
-      const res = await db.query(query);
-      return Question.parseRows(res.rows);
+      if (topicIds && topicIds.length > 0) {
+        const placeholders = topicIds.map((_, i) => `$${i + 1}`).join(',');
+        query = `
+          SELECT * 
+          FROM question que
+          JOIN question_option opt ON que.que_id = opt.que_id
+          JOIN question_type typ ON typ.typ_id = que.typ_id
+          JOIN question_topic top ON top.top_id = que.top_id
+          JOIN (
+            SELECT que_id AS random_id 
+            FROM question 
+            WHERE que_status = 'VAL' 
+            AND top_id IN (${placeholders})
+            ORDER BY random() 
+            LIMIT 1
+          ) AS rand ON que.que_id = rand.random_id;
+        `;
+        const res = await db.query(query, topicIds);
+        return Question.parseRows(res.rows);
+      } else {
+        query = `
+          SELECT * 
+          FROM question que
+          JOIN question_option opt ON que.que_id = opt.que_id
+          JOIN question_type typ ON typ.typ_id = que.typ_id
+          JOIN question_topic top ON top.top_id = que.top_id
+          JOIN (
+            SELECT que_id AS random_id FROM question Where que_status = 'VAL' ORDER BY random() LIMIT 1
+          ) AS rand ON que.que_id = rand.random_id;
+        `;
+        const res = await db.query(query);
+        return Question.parseRows(res.rows);
+      }
     }
 
     if (DB_MODE.toUpperCase() === "MYSQL") {
-      query = `
-        SELECT * 
-        FROM question que
-        JOIN question_option opt ON que.que_id = opt.que_id
-        JOIN question_type typ ON typ.typ_id = que.typ_id
-        JOIN question_topic top ON top.top_id = que.top_id
-        JOIN (
-          SELECT que_id AS random_id FROM question Where que_status = 'VAL' ORDER BY RAND() LIMIT 1
-        ) AS rand ON que.que_id = rand.random_id;
-      `;
-      const [rows] = await db.query(query);
-      return Question.parseRows(rows);
+      if (topicIds && topicIds.length > 0) {
+        const placeholders = topicIds.map(() => '?').join(',');
+        query = `
+          SELECT * 
+          FROM question que
+          JOIN question_option opt ON que.que_id = opt.que_id
+          JOIN question_type typ ON typ.typ_id = que.typ_id
+          JOIN question_topic top ON top.top_id = que.top_id
+          JOIN (
+            SELECT que_id AS random_id 
+            FROM question 
+            WHERE que_status = 'VAL' 
+            AND top_id IN (${placeholders})
+            ORDER BY RAND() 
+            LIMIT 1
+          ) AS rand ON que.que_id = rand.random_id;
+        `;
+        const [rows] = await db.query(query, topicIds);
+        return Question.parseRows(rows);
+      } else {
+        query = `
+          SELECT * 
+          FROM question que
+          JOIN question_option opt ON que.que_id = opt.que_id
+          JOIN question_type typ ON typ.typ_id = que.typ_id
+          JOIN question_topic top ON top.top_id = que.top_id
+          JOIN (
+            SELECT que_id AS random_id FROM question Where que_status = 'VAL' ORDER BY RAND() LIMIT 1
+          ) AS rand ON que.que_id = rand.random_id;
+        `;
+        const [rows] = await db.query(query);
+        return Question.parseRows(rows);
+      }
     }
 
     throw new Error("❌ Mode de base de données inconnu");
@@ -264,9 +306,37 @@ class Question {
       q.topic,
       q.type,
       q.image_link
-    )
-  );
-}
+    ));
+  }
+
+  static async getNbQuestion(topicIds = null){
+    const db = await initClient();
+    let query;
+    if (DB_MODE.toUpperCase() === "POSTGRES") {
+      if (topicIds && topicIds.length > 0) {
+        const placeholders = topicIds.map((_, i) => `$${i + 1}`).join(',');
+        query = `SELECT COUNT(*) AS count FROM question WHERE que_status = 'VAL' AND top_id IN (${placeholders})`;
+        const res = await db.query(query, topicIds);
+        return parseInt(res.rows[0].count, 10);
+      } else {
+        query = `SELECT COUNT(*) AS count FROM question WHERE que_status = 'VAL'`;
+        const res = await db.query(query);
+        return parseInt(res.rows[0].count, 10);
+      }
+    }
+    if (DB_MODE.toUpperCase() === "MYSQL") {
+      if (topicIds && topicIds.length > 0) {
+        const placeholders = topicIds.map(() => '?').join(',');
+        query = `SELECT COUNT(*) AS count FROM question WHERE que_status = 'VAL' AND top_id IN (${placeholders})`;
+        const [rows] = await db.query(query, topicIds);
+        return parseInt(rows[0].count, 10);
+      } else {
+        query = `SELECT COUNT(*) AS count FROM question WHERE que_status = 'VAL'`;
+        const [rows] = await db.query(query);
+        return parseInt(rows[0].count, 10);
+      }
+    }
+  }
 
 
 }
