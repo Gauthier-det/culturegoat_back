@@ -1,7 +1,7 @@
 const { initClient, DB_MODE } = require("../db/dbConnection");
 
 class Question {
-  constructor(id, question, options, response, desc, topic, type, image_link) {
+  constructor(id, question, options, response, desc, topic, type, image_link, credit) {
     this.id = id;
     this.question = question;
     this.options = options;
@@ -9,7 +9,8 @@ class Question {
     this.desc = desc;
     this.image_link = image_link;
     this.topic = topic;
-    this.type = type;
+    this.type = type
+    this.credit = credit;
   }
 
   async save(topic_id, type_id) {
@@ -173,7 +174,8 @@ class Question {
       q.que_desc_response,
       q.top_label,
       q.typ_label,
-      q.que_image
+      q.que_image,
+      q.que_credit
     );
   }
 
