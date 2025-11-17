@@ -1,7 +1,7 @@
 const { initClient, DB_MODE } = require("../db/dbConnection");
 
 class Question {
-  constructor(id, question, options, response, desc, topic, type, image_link, credit) {
+  constructor(id, question, options, response, desc, topic, type, image_link) {
     this.id = id;
     this.question = question;
     this.options = options;
@@ -9,8 +9,7 @@ class Question {
     this.desc = desc;
     this.image_link = image_link;
     this.topic = topic;
-    this.type = type
-    this.credit = credit;
+    this.type = type;
   }
 
   async save(topic_id, type_id) {
@@ -31,8 +30,8 @@ class Question {
       query = `
         INSERT INTO question (que_question, que_desc_response, top_id, typ_id, que_image, que_status)
         VALUES ($1, $2, $3, $4, $5, 'ENC')
+        RETURNING que_id
       `;
-      values.unshift(this.id);
       res = await db.query(query, values);
       this.id = res.rows[0].que_id;
     } else if (DB_MODE.toUpperCase() === "MYSQL") {
@@ -64,13 +63,24 @@ class Question {
           VALUES (?, ?, ?)
         `;
       }
-      //console.log("Insertion de l'option :", optionQuery, "Valeurs :", [this.id, option, isCorrect]);
       await db.query(optionQuery, [this.id, option, isCorrect]);
     } 
   }
 
   static async getRandomQuestion(topicIds = null) {
     const db = await initClient();
+
+    // ✅ Validation des topicIds
+    if (topicIds && !Array.isArray(topicIds)) {
+      throw new Error('topicIds must be an array');
+    }
+    
+    if (topicIds) {
+      topicIds = topicIds.filter(id => Number.isInteger(id) && id > 0);
+      if (topicIds.length === 0) {
+        topicIds = null;
+      }
+    }
 
     let query;
     if (DB_MODE.toUpperCase() === "POSTGRES") {
@@ -174,8 +184,7 @@ class Question {
       q.que_desc_response,
       q.top_label,
       q.typ_label,
-      q.que_image,
-      q.que_credit
+      q.que_image
     );
   }
 
@@ -186,7 +195,6 @@ class Question {
     if (DB_MODE.toUpperCase() === "POSTGRES") {
       query = `SELECT * FROM question_topic t;`;
       const res = await db.query(query);
-      // On renvoie id + label
       return res.rows.map(r => ({ id: r.top_id, label: r.top_label }));
     }
 
@@ -279,40 +287,53 @@ class Question {
   }
 
   static groupTempRows(rows) {
-  const grouped = {};
-  for (const r of rows) {
-    if (!grouped[r.que_id]) {
-      grouped[r.que_id] = {
-        id: r.que_id,
-        question: r.que_question,
-        desc: r.que_desc_response,
-        image_link: r.que_image,
-        topic: { id: r.top_id, label: r.top_label },
-        type: { id: r.typ_id, label: r.typ_label },
-        options: [],
-        response: ""
-      };
+    const grouped = {};
+    for (const r of rows) {
+      if (!grouped[r.que_id]) {
+        grouped[r.que_id] = {
+          id: r.que_id,
+          question: r.que_question,
+          desc: r.que_desc_response,
+          image_link: r.que_image,
+          topic: { id: r.top_id, label: r.top_label },
+          type: { id: r.typ_id, label: r.typ_label },
+          options: [],
+          response: ""
+        };
+      }
+      grouped[r.que_id].options.push(r.opt_label);
+      if (r.opt_iscorrect === 1) {
+        grouped[r.que_id].response = r.opt_label;
+      }
     }
-    grouped[r.que_id].options.push(r.opt_label);
-    if (r.opt_iscorrect === 1) {
-      grouped[r.que_id].response = r.opt_label;
-    }
-  }
-  return Object.values(grouped).map(q =>
-    new Question(
-      q.id,
-      q.question,
-      q.options,
-      q.response,
-      q.desc,
-      q.topic,
-      q.type,
-      q.image_link
-    ));
+    return Object.values(grouped).map(q =>
+      new Question(
+        q.id,
+        q.question,
+        q.options,
+        q.response,
+        q.desc,
+        q.topic,
+        q.type,
+        q.image_link
+      ));
   }
 
   static async getNbQuestion(topicIds = null){
     const db = await initClient();
+    
+    // ✅ Validation
+    if (topicIds && !Array.isArray(topicIds)) {
+      throw new Error('topicIds must be an array');
+    }
+    
+    if (topicIds) {
+      topicIds = topicIds.filter(id => Number.isInteger(id) && id > 0);
+      if (topicIds.length === 0) {
+        topicIds = null;
+      }
+    }
+    
     let query;
     if (DB_MODE.toUpperCase() === "POSTGRES") {
       if (topicIds && topicIds.length > 0) {
@@ -339,8 +360,6 @@ class Question {
       }
     }
   }
-
-
 }
 
 module.exports = Question;
