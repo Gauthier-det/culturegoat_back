@@ -1,4 +1,5 @@
 require("dotenv").config();
+const path = require('path');
 const { Client: PGClient } = require("pg");
 const mysql = require("mysql2/promise");
 const fs = require('fs');
@@ -9,6 +10,7 @@ const DB_HOST_MYSQL = process.env.DB_HOST;
 const DB_USER = process.env.DB_USER;
 const DB_PASSWORD = process.env.DB_PASS;
 const DB_NAME = process.env.DB_NAME;
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
 let client;
 
@@ -19,12 +21,18 @@ async function initClient() {
   if (client) return client;
 
   if (DB_MODE.toUpperCase() === "POSTGRES") {
+    const sslConfig = NODE_ENV === 'production' 
+      ? {
+          rejectUnauthorized: true,  
+          ca: fs.readFileSync(path.join(__dirname, 'ca.pem')).toString()
+        }
+      : {
+          rejectUnauthorized: false  
+        };
+        
     client = new PGClient({
       connectionString: DB_HOST_PG,
-      ssl: {
-        rejectUnauthorized: true,
-        ca: process.env.PGSSLROOTCERT
-      }
+      ssl: sslConfig
     });
     await client.connect();
     console.log("✅ PostgreSQL connected");
@@ -34,7 +42,7 @@ async function initClient() {
       user: DB_USER,
       password: DB_PASSWORD,
       database: DB_NAME,
-      ssl: false,
+      ssl: NODE_ENV === 'production' ? { rejectUnauthorized: true } : false,
     });
     console.log("✅ MySQL connected");
   } else {
