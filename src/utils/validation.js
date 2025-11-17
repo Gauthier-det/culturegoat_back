@@ -24,11 +24,15 @@ const questionSchema = Joi.object({
  */
 const gameRulesSchema = Joi.object({
   rulesOption: Joi.string().valid('FixedQuestions', 'ScoreMax').required(),
-  scoreMax: Joi.number().integer().min(0).max(100).required(),
-  questionMax: Joi.number().integer().min(0).max(100).required(),
-  qcmTimeLimit: Joi.number().integer().min(5).max(60).required(),
-  openTimeLimit: Joi.number().integer().min(5).max(120).required(),
-  selectedTopics: Joi.array().items(Joi.number().integer().positive()).min(0).required()
+  scoreMax: Joi.number().integer().min(0).max(100).default(0),
+  questionMax: Joi.number().integer().min(0).max(100).default(5),
+  qcmTimeLimit: Joi.number().integer().min(5).max(60).default(8),
+  openTimeLimit: Joi.number().integer().min(5).max(120).default(12),
+  selectedTopics: Joi.array()
+    .items(Joi.number().integer().positive())
+    .min(0)
+    .default([]) // ✅ Valeur par défaut = tableau vide (tous les topics)
+    .optional()   // ✅ Rendre optionnel
 });
 
 /**

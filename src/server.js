@@ -12,16 +12,93 @@ const { authenticateSocket, isAdmin, isCreatorOrAdmin, generateToken } = require
 const RateLimiter = require("./middleware/rateLimiter");
 const { sanitizeInput, sanitizeObject } = require("./utils/sanitize");
 const { questionSchema, gameRulesSchema, validate } = require("./utils/validation");
+const logger = require('./utils/logger');
+const { validateEnv } = require('./config/validateEnv');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const compression = require('compression');
+
+validateEnv();
 
 const app = express();
 const server = http.createServer(app);
+
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+app.use(compression());
+
+// Rate limiting HTTP
+const httpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200,
+  message: 'Too many requests from this IP, please try again later.'
+});
+app.use('/api/', httpLimiter);
+
+// Health check endpoint
+app.get('/health', async (req, res) => {
+  try {
+    const db = await initClient();
+    
+    // Test simple de la BDD
+    let query = DB_MODE.toUpperCase() === 'POSTGRES' 
+      ? 'SELECT 1 as result' 
+      : 'SELECT 1 as result';
+    
+    if (DB_MODE.toUpperCase() === 'POSTGRES') {
+      await db.query(query);
+    } else {
+      await db.query(query);
+    }
+    
+    res.status(200).json({
+      status: 'ok',
+      database: 'connected',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      version: process.env.npm_package_version || '1.0.0'
+    });
+  } catch (error) {
+    logger.error('Health check failed', { error: error.message });
+    res.status(503).json({ 
+      status: 'error', 
+      database: 'disconnected',
+      message: 'Service unavailable' 
+    });
+  }
+});
+
+// Metrics endpoint (optionnel mais utile)
+app.get('/metrics', (req, res) => {
+  const metrics = {
+    connectedSockets: io.engine.clientsCount,
+    activeRooms: Object.keys(rooms).length,
+    memory: {
+      used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + ' MB',
+      total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + ' MB'
+    },
+    uptime: Math.floor(process.uptime()) + ' seconds',
+    nodeVersion: process.version
+  };
+  res.json(metrics);
+});
+
+// Route de base
+app.get('/', (req, res) => {
+  res.json({ 
+    name: 'CultureGoat API', 
+    version: '1.0.0',
+    status: 'running' 
+  });
+});
 
 // Configuration CORS sécurisée
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
 const io = new Server(server, {
   cors: {
-    origin: FRONTEND_URL,
+    origin: [FRONTEND_URL, 'http://localhost:4173'],
     methods: ["GET", "POST"],
     credentials: true
   },
@@ -179,7 +256,7 @@ io.on("connection", (socket) => {
       }
       
       if (!rooms[roomId]) {
-        console.log("Nouveau joueur :", socket.id, " dans la room :", roomId);
+        logger.info('Nouveau joueur', { socketId: socket.id, roomId });
         rooms[roomId] = {
           players: {},
           host: socket.id,
@@ -428,7 +505,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Rejeter une question (PROTÉGÉ)
+  // Rejeter une question
   socket.on("deleteQuestion", async (questionId) => {
     try {
       if (!isAdmin(socket)) {
@@ -449,7 +526,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Valider une question (PROTÉGÉ)
+  // Valider une question 
   socket.on("validateQuestion", async (questionId) => {
     try {
       if (!isAdmin(socket)) {
@@ -534,6 +611,34 @@ io.on("connection", (socket) => {
     }
   });
 });
+
+process.on('uncaughtException', (error) => {
+  logger.error('💥 Uncaught Exception:', { error: error.message, stack: error.stack });
+  console.error('💥 Uncaught Exception:', error);
+  setTimeout(() => process.exit(1), 1000);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('💥 Unhandled Rejection:', { reason, promise });
+  console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM signal received: closing HTTP server');
+  server.close(() => {
+    logger.info('HTTP server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  logger.info('SIGINT signal received: closing HTTP server');
+  server.close(() => {
+    logger.info('HTTP server closed');
+    process.exit(0);
+  });
+});
+
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
