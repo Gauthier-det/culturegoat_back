@@ -12,6 +12,10 @@
     "pm2:restart": "pm2 restart culturegoat-api",
     "pm2:logs": "pm2 logs culturegoat-api",
     "pm2:delete": "pm2 delete culturegoat-api",
+    "setup": "./scripts/setup.sh",
+    "deploy": "./scripts/deploy.sh",
+    "backup": "./scripts/backup.sh",
+    "health": "./scripts/health-check.sh",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": ["game", "quiz", "socket.io"],
