@@ -37,12 +37,14 @@ async function initClient() {
     await client.connect();
     console.log("✅ PostgreSQL connected");
   } else if (DB_MODE.toUpperCase() === "MYSQL") {
+
     client = await mysql.createConnection({
       host: DB_HOST_MYSQL,
       user: DB_USER,
       password: DB_PASSWORD,
       database: DB_NAME,
-      ssl: NODE_ENV === 'production' ? { rejectUnauthorized: true } : false,
+      ssl: false
+      //ssl: NODE_ENV === 'production' ? { rejectUnauthorized: true } : false,
     });
     console.log("✅ MySQL connected");
   } else {

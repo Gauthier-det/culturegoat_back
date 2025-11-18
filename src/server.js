@@ -98,7 +98,13 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
 const io = new Server(server, {
   cors: {
-    origin: [FRONTEND_URL, 'http://localhost:4173'],
+    origin: [
+      FRONTEND_URL,                    
+      'http://localhost:5173',
+      'http://localhost:8080',
+      'http://localhost:4173',
+      'http://127.0.0.1:8080',
+    ],
     methods: ["GET", "POST"],
     credentials: true
   },
