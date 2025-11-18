@@ -104,6 +104,7 @@ const io = new Server(server, {
       'http://localhost:8080',
       'http://localhost:4173',
       'http://127.0.0.1:8080',
+      'http://79.137.77.37:8080'
     ],
     methods: ["GET", "POST"],
     credentials: true
