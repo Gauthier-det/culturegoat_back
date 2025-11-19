@@ -1,7 +1,7 @@
 const { initClient, DB_MODE } = require("../db/dbConnection");
 
 class Question {
-  constructor(id, question, options, response, desc, topic, type, image_link) {
+  constructor(id, question, options, response, desc, topic, type, image_link, image_credit) {
     this.id = id;
     this.question = question;
     this.options = options;
@@ -10,6 +10,7 @@ class Question {
     this.image_link = image_link;
     this.topic = topic;
     this.type = type;
+    this.image_credit = image_credit;
   }
 
   async save(topic_id, type_id) {
@@ -21,23 +22,24 @@ class Question {
       this.desc,
       topic_id,
       type_id,
-      this.image_link
+      this.image_link,
+      this.image_credit
     ];
 
     let res;
 
     if (DB_MODE.toUpperCase() === "POSTGRES") { 
       query = `
-        INSERT INTO question (que_question, que_desc_response, top_id, typ_id, que_image, que_status)
-        VALUES ($1, $2, $3, $4, $5, 'ENC')
+        INSERT INTO question (que_question, que_desc_response, top_id, typ_id, que_image, que_status, que_img_credit)
+        VALUES ($1, $2, $3, $4, $5, 'ENC', $6)
         RETURNING que_id
       `;
       res = await db.query(query, values);
       this.id = res.rows[0].que_id;
     } else if (DB_MODE.toUpperCase() === "MYSQL") {
       query = `
-        INSERT INTO question (que_question, que_desc_response, top_id, typ_id, que_image, que_status)
-        VALUES (?, ?, ?, ?, ?, 'ENC')
+        INSERT INTO question (que_question, que_desc_response, top_id, typ_id, que_image, que_status, que_img_credit)
+        VALUES (?, ?, ?, ?, ?, 'ENC', ?)
       `;
       res = await db.query(query, values);
       this.id = res[0].insertId;
@@ -184,7 +186,8 @@ class Question {
       q.que_desc_response,
       q.top_label,
       q.typ_label,
-      q.que_image
+      q.que_image,
+      q.que_img_credit
     );
   }
 
@@ -295,6 +298,7 @@ class Question {
           question: r.que_question,
           desc: r.que_desc_response,
           image_link: r.que_image,
+          image_credit: r.que_img_credit,
           topic: { id: r.top_id, label: r.top_label },
           type: { id: r.typ_id, label: r.typ_label },
           options: [],
@@ -315,7 +319,8 @@ class Question {
         q.desc,
         q.topic,
         q.type,
-        q.image_link
+        q.image_link,
+        q.image_credit
       ));
   }
 

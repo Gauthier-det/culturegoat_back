@@ -16,7 +16,8 @@ const questionSchema = Joi.object({
     id: Joi.number().integer().positive().required(),
     label: Joi.string().max(50).required()
   }).required(),
-  image_link: Joi.string().uri().max(500).allow('', null)
+  image_link: Joi.string().uri().max(500).allow('', null),
+  image_credit: Joi.string().min(5).max(255).allow('', null),
 });
 
 /**

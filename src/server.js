@@ -203,6 +203,7 @@ async function sendQuestion(roomId) {
     response: q.response,
     desc: q.desc,
     image_link: q.image_link,
+    image_credit: q.image_credit
   });
   
   room.questionTimeOut = setTimeout(() => {
@@ -488,7 +489,8 @@ io.on("connection", (socket) => {
         validatedData.desc,
         validatedData.topic.label,
         validatedData.type.label,
-        validatedData.image_link
+        validatedData.image_link,
+        validatedData.image_credit
       );
       
       await question.save(validatedData.topic.id, validatedData.type.id);
