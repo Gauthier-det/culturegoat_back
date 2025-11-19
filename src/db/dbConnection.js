@@ -38,7 +38,7 @@ async function initClient() {
     console.log("✅ PostgreSQL connected");
   } else if (DB_MODE.toUpperCase() === "MYSQL") {
 
-    client = await mysql.createConnection({
+    client = await mysql.createPool({
       host: DB_HOST_MYSQL,
       user: DB_USER,
       password: DB_PASSWORD,
